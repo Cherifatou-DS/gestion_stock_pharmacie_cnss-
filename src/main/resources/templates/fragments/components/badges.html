@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<span th:fragment="badge(status)" class="badge"
+      th:classappend="${status == 'VALIDEE_DBI' or status == 'LIVREE'} ? 'bg-success' : (${status == 'EN_ATTENTE_DBI' or status == 'REJETEE'} ? 'bg-danger' : (${status == 'EN_ATTENTE_SERVIE'} ? 'bg-blue' : (${status == 'AJUSTEE_DBI'} ? 'bg-warning' : (${status == 'EXPEDIEE'} ? 'bg-info' : 'bg-secondary'))))"
+      th:text="${status}">STATUT</span>
+
+<span th:fragment="order-status-badge(status)" class="badge"
+      th:classappend="${status == 'VALIDEE_DBI' or status == 'LIVREE'} ? 'bg-success' : (${status == 'EN_ATTENTE_DBI' or status == 'REJETEE'} ? 'bg-danger' : (${status == 'EN_ATTENTE_SERVIE'} ? 'bg-blue' : (${status == 'AJUSTEE_DBI'} ? 'bg-warning' : (${status == 'EXPEDIEE'} ? 'bg-info' : 'bg-secondary'))))"
+      th:text="${status == 'BROUILLON'} ? 'Brouillon' :
+              (${status == 'EN_ATTENTE_SERVIE'} ? 'En attente de service (PC)' :
+              (${status == 'EN_ATTENTE_DBI'} ? 'En attente de validation DBI' :
+              (${status == 'AJUSTEE_DBI'} ? 'Ajustée par la DBI' :
+              (${status == 'VALIDEE_DBI'} ? 'Validée par la DBI' :
+              (${status == 'EXPEDIEE'} ? 'Expédiée' :
+              (${status == 'LIVREE'} ? 'Livrée' : 'Rejetée'))))))">STATUT</span>
+</body>
+</html>

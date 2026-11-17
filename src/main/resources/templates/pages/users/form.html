@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Utilisateur - Formulaire</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <h2 class="h5 mb-3"><i class="bi bi-person-gear me-2"></i>
+        <span th:text="${userId != null} ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'">Nouvel utilisateur</span>
+    </h2>
+
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-1"></i><span th:text="${error}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-header">
+            <h3 class="card-title">Informations de l'utilisateur</h3>
+        </div>
+        <div class="card-body">
+            <form th:action="${userId != null} ? @{/users/{id}(id=${userId})} : @{/users}"
+                  th:object="${userForm}" method="post" novalidate>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="username">Identifiant <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="username" th:field="*{username}"
+                               th:readonly="${userId != null}" required>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('username')}" th:errors="*{username}"></div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="firstName">Prénom</label>
+                        <input type="text" class="form-control" id="firstName" th:field="*{firstName}">
+                        <div class="text-danger small" th:if="${#fields.hasErrors('firstName')}" th:errors="*{firstName}"></div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="lastName">Nom</label>
+                        <input type="text" class="form-control" id="lastName" th:field="*{lastName}">
+                        <div class="text-danger small" th:if="${#fields.hasErrors('lastName')}" th:errors="*{lastName}"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="email">E-mail</label>
+                        <input type="email" class="form-control" id="email" th:field="*{email}">
+                        <div class="text-danger small" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="password">
+                            Mot de passe
+                            <span th:if="${userId == null}" class="text-danger">*</span>
+                            <small class="text-muted" th:if="${userId != null}">(laisser vide pour conserver)</small>
+                        </label>
+                        <input type="password" class="form-control" id="password" th:field="*{password}"
+                               th:required="${userId == null}">
+                        <div class="text-danger small" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="roleId">Rôle <span class="text-danger">*</span></label>
+                        <select class="form-select" id="roleId" th:field="*{roleId}" required>
+                            <option value="">-- Choisir un rôle --</option>
+                            <option th:each="role : ${roles}" th:value="${role.id}" th:text="${role.name}">ADMIN</option>
+                        </select>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('roleId')}" th:errors="*{roleId}"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="entityId">Structure de rattachement <span class="text-danger">*</span></label>
+                        <select class="form-select" id="entityId" th:field="*{entityId}" required>
+                            <option value="">-- Choisir une structure --</option>
+                            <option th:each="entity : ${entities}"
+                                    th:value="${entity.id}"
+                                    th:text="${entity.code + ' - ' + entity.name}">PC - Pharmacie Centrale</option>
+                        </select>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('entityId')}" th:errors="*{entityId}"></div>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="isActive" th:field="*{isActive}">
+                            <label class="form-check-label" for="isActive">Compte actif</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex justify-content-end gap-2">
+                    <a th:href="@{/users}" class="btn btn-secondary">Annuler</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>Enregistrer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

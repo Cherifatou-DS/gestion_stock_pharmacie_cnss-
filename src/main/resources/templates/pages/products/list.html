@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Catalogue Produits</title>
+    <link rel="stylesheet" th:href="@{/plugins/datatables/css/dataTables.bootstrap5.min.css}">
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0"><i class="bi bi-capsule me-2"></i>Catalogue Produits Pharmaceutiques</h2>
+        <a th:href="@{/products/new}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>Nouveau produit
+        </a>
+    </div>
+
+    <div th:replace="~{fragments/components/alerts :: alert-success(${message})}"></div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-list me-1"></i>Liste des produits du catalogue</h3>
+        </div>
+        <div class="card-body">
+            <table id="products-table" class="table table-bordered table-striped align-middle w-100">
+                <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Désignation</th>
+                    <th>Unité</th>
+                    <th class="text-end">Prix unitaire</th>
+                    <th class="text-center" style="width: 120px;">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="product : ${products}">
+                    <td><span class="badge bg-blue" th:text="${product.code}">MED001</span></td>
+                    <td th:text="${product.designation}">Paracétamol 500mg</td>
+                    <td th:text="${product.unit}">Boîte</td>
+                    <td class="text-end"
+                        th:text="${#numbers.formatDecimal(product.unitPrice, 1, 2, 'POINT') + ' F CFA'}">500.00</td>
+                    <td class="text-center">
+                        <a th:href="@{/products/{id}/edit(id=${product.id})}" class="btn btn-sm btn-primary" title="Modifier">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script layout:fragment="scripts" th:inline="none">
+    $(function () {
+        $('#products-table').DataTable({
+            language: {
+                url: '/plugins/datatables/i18n/fr-FR.json'
+            },
+            responsive: true,
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'Tous']],
+            order: [[0, 'asc']]
+        });
+    });
+</script>
+</body>
+</html>

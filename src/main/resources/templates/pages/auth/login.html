@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - Gestion de Stock Pharmaceutique</title>
+
+    <link rel="stylesheet" th:href="@{/dist/css/adminlte.min.css}">
+    <link rel="stylesheet" th:href="@{/css/charte-graphique.css}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body.login-page {
+            background-color: #111111;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-box {
+            width: 420px;
+            max-width: 92vw;
+        }
+        .login-logo {
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        .login-logo .brand-icon {
+            color: #0d6efd;
+        }
+        .login-logo small {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.85rem;
+        }
+        .login-card {
+            background-color: #ffffff;
+            border: none;
+            border-top: 4px solid #0d6efd;
+            border-radius: 0.5rem;
+        }
+        .login-card .card-header {
+            background-color: #0d6efd;
+            color: #ffffff;
+            border: none;
+            border-radius: 0;
+        }
+        .login-card .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .login-card .btn-primary:hover {
+            background-color: #0a58ca;
+            border-color: #0a58ca;
+        }
+        .login-footer {
+            color: rgba(255, 255, 255, 0.5);
+            text-align: center;
+            margin-top: 1rem;
+            font-size: 0.85rem;
+        }
+        .input-group-text {
+            background-color: #111111;
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body class="login-page">
+
+<div class="login-box">
+    <div class="login-logo">
+        <i class="fas fa-clinic-medical brand-icon fa-2x mb-2"></i>
+        <h1 class="h4 mb-1"><strong>CNSS</strong> - Gestion des Stocks Pharmaceutiques</h1>
+        <small>Système de Gestion Intégrée des Stocks</small>
+    </div>
+
+    <div class="card login-card shadow">
+        <div class="card-header">
+            <h2 class="h6 mb-0"><i class="fas fa-sign-in-alt me-2"></i>Authentification</h2>
+        </div>
+        <div class="card-body">
+            <div th:if="${param.error}" class="alert alert-danger py-2">
+                <i class="fas fa-exclamation-circle me-1"></i>
+                Identifiant ou mot de passe incorrect, ou compte désactivé.
+            </div>
+            <div th:if="${param.logout}" class="alert alert-success py-2">
+                <i class="fas fa-check-circle me-1"></i>
+                Vous êtes déconnecté avec succès.
+            </div>
+            <div th:if="${param.expired}" class="alert alert-warning py-2">
+                <i class="fas fa-clock me-1"></i>
+                Votre session a expiré, veuillez vous reconnecter.
+            </div>
+
+            <form th:action="@{/login}" method="post">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Identifiant</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-user"></i></span>
+                        <input type="text" id="username" name="username" class="form-control"
+                               placeholder="Votre identifiant" required autofocus>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Mot de passe</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                        <input type="password" id="password" name="password" class="form-control"
+                               placeholder="Votre mot de passe" required>
+                    </div>
+                </div>
+                <div class="d-grid gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt me-1"></i> Se connecter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <p class="login-footer">Copyright &copy; 2026 CNSS - Tous droits réservés</p>
+</div>
+
+</body>
+</html>

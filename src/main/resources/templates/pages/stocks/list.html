@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Gestion des Stocks</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0"><i class="bi bi-box-seam me-2"></i>Gestion des Stocks &amp; Inventaires</h2>
+        <a th:href="@{/stocks/movements/new}" class="btn btn-primary">
+            <i class="bi bi-arrow-down-up me-1"></i>Nouveau mouvement
+        </a>
+    </div>
+
+    <div th:replace="~{fragments/components/alerts :: alert-success(${message})}"></div>
+
+    <!-- Info-box alerte stock bas -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <div class="small-box bg-danger">
+                <div class="inner">
+                    <h3 th:text="${lowStockCount}">0</h3>
+                    <p>Produit(s) en alerte de stock</p>
+                </div>
+                <div class="icon"><i class="bi bi-exclamation-triangle"></i></div>
+                <a th:href="@{/stocks(lowStockOnly=true)}" class="small-box-footer">
+                    Voir les stocks en alerte <i class="fas fa-arrow-circle-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="card card-white shadow-sm mb-3">
+        <div class="card-body py-2">
+            <form th:action="@{/stocks}" method="get" class="row g-2 align-items-center">
+                <div class="col-md-4" th:if="${!restricted}">
+                    <label class="form-label mb-0 small" for="entityId">Structure</label>
+                    <select id="entityId" name="entityId" class="form-select form-select-sm">
+                        <option value="">Toutes les structures</option>
+                        <option th:each="entity : ${entities}" th:value="${entity.id}"
+                                th:text="${entity.code + ' - ' + entity.name}"
+                                th:selected="${entity.id == selectedEntityId}">PC</option>
+                    </select>
+                </div>
+                <div class="col-md-4" th:if="${restricted}">
+                    <label class="form-label mb-0 small">Structure</label>
+                    <input type="text" class="form-control form-control-sm" disabled
+                           th:value="${selectedEntityId}">
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" id="lowStockOnly" name="lowStockOnly"
+                               value="true" th:checked="${lowStockOnly}">
+                        <label class="form-check-label small" for="lowStockOnly">
+                            Stocks en alerte uniquement
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-3 text-end">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-funnel me-1"></i>Filtrer
+                    </button>
+                    <a th:href="@{/stocks/movements}" class="btn btn-sm btn-secondary">
+                        <i class="bi bi-clock-history me-1"></i>Journal des mouvements
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-boxes me-1"></i>État des stocks par structure et par produit</h3>
+        </div>
+        <div class="card-body">
+            <table id="stocks-table" class="table table-bordered table-striped align-middle w-100">
+                <thead>
+                <tr>
+                    <th>Structure</th>
+                    <th>Produit</th>
+                    <th>Unité</th>
+                    <th class="text-center">Quantité</th>
+                    <th class="text-center">Seuil d'alerte</th>
+                    <th class="text-center">Statut</th>
+                    <th class="text-center" style="width: 160px;">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="stock : ${stocks}">
+                    <td>
+                        <span class="badge bg-navy" th:text="${stock.entityCode}">PC</span>
+                        <span class="small text-muted" th:text="${stock.entityName}">Pharmacie Centrale</span>
+                    </td>
+                    <td>
+                        <strong th:text="${stock.productDesignation}">Paracétamol 500mg</strong>
+                        <span class="small text-muted d-block" th:text="${stock.productCode}">MED001</span>
+                    </td>
+                    <td th:text="${stock.productUnit}">Boîte</td>
+                    <td class="text-center fw-bold"
+                        th:classappend="${stock.lowStock} ? 'text-danger'"
+                        th:text="${stock.quantity}">125</td>
+                    <td class="text-center" th:text="${stock.minThreshold}">10</td>
+                    <td class="text-center">
+                        <span th:if="${stock.lowStock}" class="badge bg-danger">
+                            <i class="bi bi-exclamation-triangle me-1"></i>Stock bas
+                        </span>
+                        <span th:unless="${stock.lowStock}" class="badge bg-blue">Normal</span>
+                    </td>
+                    <td class="text-center">
+                        <a th:href="@{/stocks/{id}/threshold(id=${stock.id})}" class="btn btn-sm btn-secondary"
+                           title="Ajuster le seuil d'alerte">
+                            <i class="bi bi-sliders"></i>
+                        </a>
+                        <a th:href="@{/stocks/movements/new(stockId=${stock.id})}"
+                           class="btn btn-sm btn-primary" title="Enregistrer un mouvement">
+                            <i class="bi bi-arrow-down-up"></i>
+                        </a>
+                    </td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(stocks)}">
+                    <td colspan="7" class="text-center text-muted py-4">
+                        Aucune ligne de stock. Les stocks se créent automatiquement lors du premier mouvement
+                        (entrée ou ajustement d'inventaire).
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script layout:fragment="scripts" th:inline="none">
+    $(function () {
+        $('#stocks-table').DataTable({
+            language: {
+                url: '/plugins/datatables/i18n/fr-FR.json'
+            },
+            responsive: true,
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'Tous']]
+        });
+    });
+</script>
+</body>
+</html>

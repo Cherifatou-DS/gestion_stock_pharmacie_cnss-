@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Structures</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0"><i class="bi bi-hospital me-2"></i>Structures de référence</h2>
+        <a th:href="@{/entities/new}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>Nouvelle structure
+        </a>
+    </div>
+
+    <div th:replace="~{fragments/components/alerts :: alert-success(${message})}"></div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-list me-1"></i>Entités (Centre Médical, Pharmacie Centrale, Dépôt Central, DBI, Fournisseur)</h3>
+        </div>
+        <div class="card-body table-responsive p-0">
+            <table class="table table-bordered table-striped mb-0 align-middle">
+                <thead>
+                <tr>
+                    <th style="width: 120px;">Code</th>
+                    <th>Nom</th>
+                    <th>Type</th>
+                    <th class="text-center" style="width: 180px;">Créée le</th>
+                    <th class="text-center" style="width: 120px;">Statut</th>
+                    <th class="text-center" style="width: 220px;">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:if="${#lists.isEmpty(entities)}">
+                    <td colspan="6" class="text-center text-muted py-4">Aucune structure enregistrée.</td>
+                </tr>
+                <tr th:each="entity : ${entities}">
+                    <td><span class="badge bg-blue" th:text="${entity.code}">PC</span></td>
+                    <td th:text="${entity.name}">Pharmacie Centrale</td>
+                    <td th:text="${#strings.replace(#strings.replace(entity.type, '_', ' '),
+                            'PHARMACIE CENTRALE', 'Pharmacie Centrale')}">PHARMACIE_CENTRALE</td>
+                    <td class="text-center" th:text="${#temporals.format(entity.createdAt, 'dd/MM/yyyy')}">01/01/2026</td>
+                    <td class="text-center">
+                        <span th:if="${!entity.isActive}"
+                              class="badge bg-secondary">Désactivée</span>
+                        <span th:unless="${!entity.isActive}"
+                              class="badge bg-success">Active</span>
+                    </td>
+                    <td class="text-center">
+                        <a th:if="${entity.isActive}"
+                           th:href="@{/entities/{id}/edit(id=${entity.id})}"
+                           class="btn btn-sm btn-outline-primary"
+                           th:title="'Modifier ' + ${entity.code}">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <form th:if="${entity.isActive}"
+                              th:action="@{/entities/{id}/deactivate(id=${entity.id})}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                                    th:title="'Désactiver ' + ${entity.code}">
+                                <i class="fas fa-lock"></i>
+                            </button>
+                        </form>
+                        <form th:unless="${entity.isActive}"
+                              th:action="@{/entities/{id}/reactivate(id=${entity.id})}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-success"
+                                    th:title="'Réactiver ' + ${entity.code}">
+                                <i class="fas fa-unlock"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</body>
+</html>

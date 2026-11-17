@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Utilisateurs</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0"><i class="bi bi-people me-2"></i>Gestion des Utilisateurs</h2>
+        <a th:href="@{/users/new}" class="btn btn-primary">
+            <i class="bi bi-person-plus me-1"></i>Nouvel utilisateur
+        </a>
+    </div>
+
+    <div th:if="${message}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-1"></i><span th:text="${message}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-list me-1"></i>Liste des utilisateurs</h3>
+        </div>
+        <div class="card-body table-responsive p-0">
+            <table class="table table-bordered table-striped mb-0 align-middle">
+                <thead>
+                <tr>
+                    <th>Identifiant</th>
+                    <th>Nom complet</th>
+                    <th>E-mail</th>
+                    <th>Rôle</th>
+                    <th>Structure</th>
+                    <th>Statut</th>
+                    <th class="text-center" style="width: 260px;">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:if="${#lists.isEmpty(users)}">
+                    <td colspan="7" class="text-center text-muted py-4">Aucun utilisateur enregistré.</td>
+                </tr>
+                <tr th:each="user : ${users}">
+                    <td th:text="${user.username}">admin</td>
+                    <td th:text="${user.fullName}">Admin CNSS</td>
+                    <td th:text="${user.email}">-</td>
+                    <td><span class="badge bg-blue" th:text="${user.roleName}">ADMIN</span></td>
+                    <td>
+                        <span class="badge bg-navy me-1" th:text="${user.entityCode}">PC</span>
+                        <span th:text="${user.entityName}">Pharmacie Centrale</span>
+                    </td>
+                    <td class="text-center">
+                        <span th:if="${user.isActive}" class="badge bg-success">Actif</span>
+                        <span th:unless="${user.isActive}" class="badge bg-danger">Désactivé</span>
+                    </td>
+                    <td class="text-center">
+                        <a th:href="@{/users/{id}/edit(id=${user.id})}" class="btn btn-sm btn-primary" title="Modifier">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <form th:action="@{/users/{id}/toggle-active(id=${user.id})}" method="post" class="d-inline"
+                              th:if="${user.username != #authentication.name}">
+                            <button type="submit" class="btn btn-sm"
+                                    th:classappend="${user.isActive} ? 'btn-danger' : 'btn-success'"
+                                    th:title="${user.isActive} ? 'Désactiver' : 'Activer'">
+                                <i class="fas" th:classappend="${user.isActive} ? 'fa-lock' : 'fa-unlock'"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</body>
+</html>

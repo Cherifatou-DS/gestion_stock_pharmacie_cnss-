@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Stock - Seuil d'alerte</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <h2 class="h5 mb-3"><i class="bi bi-sliders me-2"></i>Seuil d'alerte de réapprovisionnement</h2>
+
+    <div th:replace="~{fragments/components/alerts :: alert-danger(${error})}"></div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-header">
+            <h3 class="card-title">Ligne de stock</h3>
+        </div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Structure</dt>
+                <dd class="col-sm-9" th:text="${stock.entityCode + ' - ' + stock.entityName}">PC</dd>
+                <dt class="col-sm-3">Produit</dt>
+                <dd class="col-sm-9" th:text="${stock.productCode + ' - ' + stock.productDesignation}">MED001</dd>
+                <dt class="col-sm-3">Quantité actuelle</dt>
+                <dd class="col-sm-9" th:text="${stock.quantity + ' ' + stock.productUnit}">125 Boîte</dd>
+            </dl>
+
+            <form th:action="@{/stocks/{id}/threshold(id=${stock.id})}"
+                  th:object="${thresholdForm}" method="post" novalidate class="mt-4">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label" for="minThreshold">Seuil d'alerte <span class="text-danger">*</span></label>
+                        <input type="number" min="0" class="form-control" id="minThreshold" th:field="*{minThreshold}" required>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('minThreshold')}"
+                             th:errors="*{minThreshold}"></div>
+                        <div class="form-text">Une alerte est levée dès que la quantité est inférieure ou égale au seuil.</div>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex justify-content-end gap-2">
+                    <a th:href="@{/stocks}" class="btn btn-secondary">Annuler</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>Enregistrer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<aside th:fragment="sidebar" class="app-sidebar sidebar-noir shadow">
+    <div class="sidebar-brand">
+        <a th:href="@{/dashboard}" class="brand-link">
+            <span class="brand-text fw-light">CNSS - Gestion Stock</span>
+        </a>
+    </div>
+
+    <div class="sidebar-wrapper">
+        <nav class="mt-2" aria-label="Navigation principale">
+            <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu" data-accordion="false">
+                <li class="nav-header">Modules</li>
+                <li class="nav-item">
+                    <a th:href="@{/dashboard}" class="nav-link" data-path="/dashboard">
+                        <i class="nav-icon bi bi-speedometer"></i>
+                        <p>Tableau de bord</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a th:href="@{/products}" class="nav-link" data-path="/products">
+                        <i class="nav-icon bi bi-capsule"></i>
+                        <p>Catalogue Produits</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a th:href="@{/stocks}" class="nav-link" data-path="/stocks">
+                        <i class="nav-icon bi bi-box-seam"></i>
+                        <p>Gestion des Stocks</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a th:href="@{/orders}" class="nav-link" data-path="/orders">
+                        <i class="nav-icon bi bi-cart3"></i>
+                        <p>Commandes</p>
+                    </a>
+                </li>
+                <li class="nav-header">Administration</li>
+                <li class="nav-item">
+                    <a th:href="@{/users}" class="nav-link" data-path="/users">
+                        <i class="nav-icon bi bi-people"></i>
+                        <p>Utilisateurs</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a th:href="@{/entities}" class="nav-link" data-path="/entities">
+                        <i class="nav-icon bi bi-hospital"></i>
+                        <p>Structures</p>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a th:href="@{/audit}" class="nav-link" data-path="/audit">
+                        <i class="nav-icon bi bi-clock-history"></i>
+                        <p>Traçabilité</p>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</aside>
+</body>
+</html>

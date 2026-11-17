@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="btn-primary(text, url)">
+    <a th:href="${url}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> <span th:text="${text}">Ajouter</span>
+    </a>
+</div>
+
+<div th:fragment="btn-danger(text, action)">
+    <button type="submit" class="btn btn-danger" th:formaction="${action}">
+        <i class="fas fa-trash"></i> <span th:text="${text}">Supprimer</span>
+    </button>
+</div>
+
+<div th:fragment="btn-success(text)">
+    <button type="submit" class="btn btn-success">
+        <i class="fas fa-check"></i> <span th:text="${text}">Valider</span>
+    </button>
+</div>
+</body>
+</html>

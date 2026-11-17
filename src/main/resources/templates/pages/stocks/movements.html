@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Journal des mouvements de stock</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0"><i class="bi bi-clock-history me-2"></i>Journal des mouvements de stock</h2>
+        <a th:href="@{/stocks/movements/new}" class="btn btn-primary">
+            <i class="bi bi-arrow-down-up me-1"></i>Nouveau mouvement
+        </a>
+    </div>
+
+    <div th:replace="~{fragments/components/alerts :: alert-success(${message})}"></div>
+
+    <!-- Filtres -->
+    <div class="card card-white shadow-sm mb-3">
+        <div class="card-body py-2">
+            <form th:action="@{/stocks/movements}" method="get" class="row g-2 align-items-end">
+                <div class="col-md-4" th:if="${!restricted}">
+                    <label class="form-label mb-0 small" for="entityId">Structure</label>
+                    <select id="entityId" name="entityId" class="form-select form-select-sm">
+                        <option value="">Toutes les structures</option>
+                        <option th:each="entity : ${entities}" th:value="${entity.id}"
+                                th:text="${entity.code + ' - ' + entity.name}"
+                                th:selected="${entity.id == selectedEntityId}">PC</option>
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label mb-0 small" for="productId">Produit</label>
+                    <select id="productId" name="productId" class="form-select form-select-sm">
+                        <option value="">Tous les produits</option>
+                        <option th:each="product : ${products}" th:value="${product.id}"
+                                th:text="${product.code + ' - ' + product.designation}"
+                                th:selected="${product.id == selectedProductId}">MED001</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-0 small" for="type">Type</label>
+                    <select id="type" name="type" class="form-select form-select-sm">
+                        <option value="">Tous</option>
+                        <option th:each="movementType : ${movementTypes}" th:value="${movementType.name()}"
+                                th:text="${movementType.label}"
+                                th:selected="${movementType.name() == selectedType}">ENTREE</option>
+                    </select>
+                </div>
+                <div class="col-md-3 text-end">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-funnel me-1"></i>Filtrer
+                    </button>
+                    <a th:href="@{/stocks/movements}" class="btn btn-sm btn-secondary">Réinitialiser</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-body">
+            <table id="movements-table" class="table table-bordered table-striped align-middle w-100">
+                <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Structure</th>
+                    <th>Produit</th>
+                    <th>Type</th>
+                    <th class="text-center">Qté mouvement</th>
+                    <th class="text-center">Stock avant</th>
+                    <th class="text-center">Stock après</th>
+                    <th>Effectué par</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="movement : ${movements}">
+                    <td th:text="${#temporals.format(movement.createdAt, 'dd/MM/yyyy HH:mm')}">12/11/2026 09:30</td>
+                    <td>
+                        <span class="badge bg-navy" th:text="${movement.entityCode}">PC</span>
+                        <span class="small text-muted" th:text="${movement.entityName}">Pharmacie Centrale</span>
+                    </td>
+                    <td>
+                        <strong th:text="${movement.productDesignation}">Paracétamol 500mg</strong>
+                        <span class="small text-muted d-block" th:text="${movement.productCode}">MED001</span>
+                    </td>
+                    <td th:switch="${movement.type}">
+                        <span th:case="'ENTREE'" class="badge bg-success">Entrée</span>
+                        <span th:case="'SORTIE'" class="badge bg-warning text-dark">Sortie</span>
+                        <span th:case="'AJUSTEMENT_INVENTAIRE'" class="badge bg-blue">Ajustement</span>
+                        <span th:case="*" th:text="${movement.type}"></span>
+                    </td>
+                    <td class="text-center fw-bold"
+                        th:classappend="${movement.quantity < 0} ? 'text-danger'"
+                        th:text="${movement.quantity}">50</td>
+                    <td class="text-center" th:text="${movement.stockBefore}">75</td>
+                    <td class="text-center" th:text="${movement.stockAfter}">125</td>
+                    <td th:text="${movement.createdByName}">Admin CNSS</td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(movements)}">
+                    <td colspan="8" class="text-center text-muted py-4">Aucun mouvement enregistré.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script layout:fragment="scripts" th:inline="none">
+    $(function () {
+        $('#movements-table').DataTable({
+            language: {
+                url: '/plugins/datatables/i18n/fr-FR.json'
+            },
+            responsive: true,
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'Tous']],
+            order: [[0, 'desc']]
+        });
+    });
+</script>
+</body>
+</html>

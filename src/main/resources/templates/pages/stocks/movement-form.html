@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Mouvement de stock - Formulaire</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <h2 class="h5 mb-3"><i class="bi bi-arrow-down-up me-2"></i>Enregistrement d'un mouvement de stock</h2>
+
+    <div th:replace="~{fragments/components/alerts :: alert-danger(${error})}"></div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-header">
+            <h3 class="card-title">Informations du mouvement</h3>
+        </div>
+        <div class="card-body">
+            <form th:action="@{/stocks/movements}" th:object="${movementForm}" method="post" novalidate>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="entityId">Structure <span class="text-danger">*</span></label>
+                        <select id="entityId" th:field="*{entityId}" class="form-select" required>
+                            <option value="">-- Sélectionner --</option>
+                            <option th:each="entity : ${entities}" th:value="${entity.id}"
+                                    th:text="${entity.code + ' - ' + entity.name}">PC</option>
+                        </select>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('entityId')}"
+                             th:errors="*{entityId}"></div>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label" for="productId">Produit <span class="text-danger">*</span></label>
+                        <select id="productId" th:field="*{productId}" class="form-select" required>
+                            <option value="">-- Sélectionner --</option>
+                            <option th:each="product : ${products}" th:value="${product.id}"
+                                    th:text="${product.code + ' - ' + product.designation}">MED001</option>
+                        </select>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('productId')}"
+                             th:errors="*{productId}"></div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="type">Type de mouvement <span class="text-danger">*</span></label>
+                        <select id="type" th:field="*{type}" class="form-select" required>
+                            <option value="">-- Sélectionner --</option>
+                            <option th:each="movementType : ${movementTypes}" th:value="${movementType.name()}"
+                                    th:text="${movementType.label}">ENTREE</option>
+                        </select>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('type')}"
+                             th:errors="*{type}"></div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-2">
+                    <div class="col-md-3">
+                        <label class="form-label" for="quantity">Quantité <span class="text-danger">*</span></label>
+                        <input type="number" min="0" class="form-control" id="quantity" th:field="*{quantity}" required>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('quantity')}"
+                             th:errors="*{quantity}"></div>
+                    </div>
+                    <div class="col-md-9">
+                        <div class="form-text mt-4">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>Entrée</strong> : quantité ajoutée au stock (approvisionnement).&nbsp;
+                            <strong>Sortie</strong> : quantité retirée du stock (délivrance).&nbsp;
+                            <strong>Ajustement d'inventaire</strong> : quantité comptée physiquement ;
+                            l'écart est journalisé automatiquement.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex justify-content-end gap-2">
+                    <a th:href="@{/stocks}" class="btn btn-secondary">Annuler</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check me-1"></i>Enregistrer le mouvement
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

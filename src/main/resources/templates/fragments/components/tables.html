@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="data-table(id, headers)">
+    <table th:id="${id}" class="table table-bordered table-striped">
+        <thead>
+        <tr>
+            <th th:each="header : ${headers}" th:text="${header}">En-tête</th>
+        </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

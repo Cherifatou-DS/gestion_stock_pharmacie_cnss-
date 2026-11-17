@@ -1,0 +1,172 @@
+/*
+ * Charte graphique CNSS — Déclinaison AdminLTE 4
+ * Palette institutionnelle : Bleu (principal), Rouge (alerte/rejet),
+ * Blanc (fond de contenu), Noir (sidebar & typographie).
+ */
+
+:root {
+    --cnss-bleu: #0d6efd;
+    --cnss-bleu-fonce: #0a58ca;
+    --cnss-navy: #001f3f;
+    --cnss-rouge: #dc3545;
+    --cnss-rouge-fonce: #b02a37;
+    --cnss-noir: #111111;
+    --cnss-blanc: #ffffff;
+}
+
+/* =========================================================
+ * BLEU — Header Navbar (navbar-dark navbar-primary / navbar-navy)
+ * ========================================================= */
+.app-header.navbar-primary {
+    background-color: var(--cnss-bleu);
+}
+
+.app-header.navbar-navy {
+    background-color: var(--cnss-navy);
+}
+
+.app-header.navbar-primary .nav-link,
+.app-header.navbar-navy .nav-link {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.app-header.navbar-primary .nav-link:hover,
+.app-header.navbar-navy .nav-link:hover {
+    color: var(--cnss-blanc);
+}
+
+/* =========================================================
+ * Classes de couleur institutionnelles (déclinaison bg-blue, bg-navy…)
+ * ========================================================= */
+.bg-blue {
+    background-color: var(--cnss-bleu) !important;
+    color: var(--cnss-blanc) !important;
+}
+
+.text-bg-blue {
+    background-color: var(--cnss-bleu) !important;
+    color: var(--cnss-blanc) !important;
+}
+
+.bg-navy {
+    background-color: var(--cnss-navy) !important;
+    color: var(--cnss-blanc) !important;
+}
+
+.text-bg-navy {
+    background-color: var(--cnss-navy) !important;
+    color: var(--cnss-blanc) !important;
+}
+
+.bg-noir {
+    background-color: var(--cnss-noir) !important;
+    color: var(--cnss-blanc) !important;
+}
+
+/* =========================================================
+ * NOIR — Sidebar Menu (sidebar-dark-primary)
+ * ========================================================= */
+.app-sidebar.sidebar-noir {
+    background-color: var(--cnss-noir);
+}
+
+.app-sidebar.sidebar-noir .sidebar-brand .brand-link,
+.app-sidebar.sidebar-noir .sidebar-brand .brand-text {
+    color: var(--cnss-blanc);
+}
+
+.app-sidebar.sidebar-noir .sidebar-menu .nav-link {
+    color: rgba(255, 255, 255, 0.75);
+    border-left: 3px solid transparent;
+}
+
+.app-sidebar.sidebar-noir .sidebar-menu .nav-link:hover {
+    color: var(--cnss-blanc);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Surbrillance active bleu (défaut) ou rouge (alertes) */
+.app-sidebar.sidebar-noir .sidebar-menu .nav-link.active {
+    color: var(--cnss-blanc);
+    background-color: var(--cnss-bleu);
+    border-left-color: var(--cnss-bleu-fonce);
+}
+
+.app-sidebar.sidebar-noir .sidebar-menu .nav-link.active.alerte {
+    background-color: var(--cnss-rouge);
+    border-left-color: var(--cnss-rouge-fonce);
+}
+
+.app-sidebar.sidebar-noir .sidebar-menu .nav-header {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* =========================================================
+ * BLANC — Zone de contenu, cartes et tableaux (card-white)
+ * ========================================================= */
+.app-main {
+    background-color: var(--cnss-blanc);
+}
+
+.card-white {
+    background-color: var(--cnss-blanc);
+}
+
+.card-white .card-header {
+    background-color: var(--cnss-blanc);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+/* En-têtes de modules en bleu (cartes d'information) */
+.card-bleu .card-header {
+    background-color: var(--cnss-bleu);
+    color: var(--cnss-blanc);
+}
+
+/* En-têtes de tableaux en bleu (charte) */
+.card-white table thead th {
+    background-color: var(--cnss-bleu);
+    color: var(--cnss-blanc);
+}
+
+/* =========================================================
+ * Info-boxes / small-boxes (Bleu = validés/totaux, Rouge = alertes)
+ * ========================================================= */
+.small-box.bg-blue {
+    background-color: var(--cnss-bleu) !important;
+    color: var(--cnss-blanc) !important;
+}
+
+.small-box.bg-danger,
+.small-box.bg-rouge {
+    background-color: var(--cnss-rouge) !important;
+    color: var(--cnss-blanc) !important;
+}
+
+.small-box.bg-navy {
+    background-color: var(--cnss-navy) !important;
+    color: var(--cnss-blanc) !important;
+}
+
+/* =========================================================
+ * Boutons — Action principale bleue, rejet/suppression rouge
+ * (btn-primary / btn-danger restent natifs, renfort ci-dessous)
+ * ========================================================= */
+.btn-blue {
+    background-color: var(--cnss-bleu);
+    border-color: var(--cnss-bleu);
+    color: var(--cnss-blanc);
+}
+
+.btn-blue:hover {
+    background-color: var(--cnss-bleu-fonce);
+    border-color: var(--cnss-bleu-fonce);
+    color: var(--cnss-blanc);
+}
+
+/* =========================================================
+ * Badges de statut des commandes (Bleu, Vert, Rouge, Orange)
+ * ========================================================= */
+.badge.bg-blue {
+    color: var(--cnss-blanc) !important;
+}

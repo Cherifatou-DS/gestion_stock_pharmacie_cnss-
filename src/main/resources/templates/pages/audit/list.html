@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Traçabilité - Journal d'audit</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <h2 class="h5 mb-3"><i class="bi bi-clock-history me-2"></i>Traçabilité globale — Journal d'audit</h2>
+
+    <!-- Filtres -->
+    <div class="card card-white shadow-sm mb-3">
+        <div class="card-body py-2">
+            <form th:action="@{/audit}" method="get" class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label mb-0 small" for="userId">Utilisateur</label>
+                    <select id="userId" name="userId" class="form-select form-select-sm">
+                        <option value="">Tous les utilisateurs</option>
+                        <option th:each="user : ${users}" th:value="${user.id}"
+                                th:text="${user.username + (user.fullName != null and !user.fullName.isBlank() ? ' - ' + user.fullName : '')}"
+                                th:selected="${user.id == selectedUserId}">admin</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label mb-0 small" for="actionType">Type d'action</label>
+                    <select id="actionType" name="actionType" class="form-select form-select-sm">
+                        <option value="">Tous les types</option>
+                        <option th:each="type : ${actionTypes}" th:value="${type}" th:text="${type}"
+                                th:selected="${type == selectedActionType}">CREATION</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label mb-0 small" for="entityAffected">Entité affectée</label>
+                    <select id="entityAffected" name="entityAffected" class="form-select form-select-sm">
+                        <option value="">Toutes les entités</option>
+                        <option th:each="entity : ${entitiesAffected}" th:value="${entity}" th:text="${entity}"
+                                th:selected="${entity == selectedEntityAffected}">ORDERS</option>
+                    </select>
+                </div>
+                <div class="col-md-3 text-end mt-2">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-funnel me-1"></i>Filtrer
+                    </button>
+                    <a th:href="@{/audit}" class="btn btn-sm btn-secondary">Réinitialiser</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-body">
+            <table id="audit-table" class="table table-bordered table-striped align-middle w-100">
+                <thead>
+                <tr>
+                    <th>Horodatage</th>
+                    <th>Utilisateur</th>
+                    <th>Action</th>
+                    <th>Entité affectée</th>
+                    <th class="text-center">Enr.</th>
+                    <th>Détails</th>
+                    <th>Adresse IP</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="log : ${logs}">
+                    <td class="small text-nowrap"
+                        th:text="${#temporals.format(log.timestamp, 'dd/MM/yyyy HH:mm:ss')}">13/11/2026 09:30:00</td>
+                    <td class="small" th:text="${log.user.username}">admin</td>
+                    <td th:switch="${log.actionType}">
+                        <span th:case="'CREATION'" class="badge bg-success">Création</span>
+                        <span th:case="'CREATION_COMMANDE'" class="badge bg-success">Création</span>
+                        <span th:case="'MODIFICATION'" class="badge bg-blue">Modification</span>
+                        <span th:case="'VALIDATION_DBI'" class="badge bg-success">Validation DBI</span>
+                        <span th:case="'REJET'" class="badge bg-danger">Rejet</span>
+                        <span th:case="'REAJUSTEMENT'" class="badge bg-warning text-dark">Réajustement</span>
+                        <span th:case="'LIVRAISON'" class="badge bg-blue">Livraison</span>
+                        <span th:case="'EXPEDITION'" class="badge bg-info text-dark">Expédition</span>
+                        <span th:case="'RECEPTION'" class="badge bg-blue">Réception</span>
+                        <span th:case="'MOUVEMENT_STOCK'" class="badge bg-navy">Mouvement stock</span>
+                        <span th:case="'LOGIN_SUCCESS'" class="badge bg-secondary">Connexion</span>
+                        <span th:case="'LOGOUT'" class="badge bg-secondary">Déconnexion</span>
+                        <span th:case="*" class="badge bg-secondary" th:text="${log.actionType}"></span>
+                    </td>
+                    <td class="small" th:text="${log.entityAffected}">ORDERS</td>
+                    <td class="text-center small" th:text="${log.recordId}">1</td>
+                    <td class="small text-muted" th:text="${log.details}">—</td>
+                    <td class="small" th:text="${log.ipAddress}">127.0.0.1</td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(logs)}">
+                    <td colspan="7" class="text-center text-muted py-4">Aucune action journalisée pour ces filtres.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script layout:fragment="scripts" th:inline="none">
+    $(function () {
+        $('#audit-table').DataTable({
+            language: {
+                url: '/plugins/datatables/i18n/fr-FR.json'
+            },
+            responsive: true,
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'Tous']],
+            order: [[0, 'desc']]
+        });
+    });
+</script>
+</body>
+</html>

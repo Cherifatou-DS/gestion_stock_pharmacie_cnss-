@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Produit - Formulaire</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <h2 class="h5 mb-3"><i class="bi bi-capsule me-2"></i>
+        <span th:text="${productId != null} ? 'Modifier le produit' : 'Nouveau produit'">Nouveau produit</span>
+    </h2>
+
+    <div th:replace="~{fragments/components/alerts :: alert-danger(${error})}"></div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-header">
+            <h3 class="card-title">Informations du produit</h3>
+        </div>
+        <div class="card-body">
+            <form th:action="${productId != null} ? @{/products/{id}(id=${productId})} : @{/products}"
+                  th:object="${productForm}" method="post" novalidate>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label" for="code">Code <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="code" th:field="*{code}"
+                               placeholder="MED001" required>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('code')}" th:errors="*{code}"></div>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label" for="designation">Désignation <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="designation" th:field="*{designation}"
+                               placeholder="Paracétamol 500mg" required>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('designation')}" th:errors="*{designation}"></div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" for="unit">Unité <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="unit" th:field="*{unit}"
+                               placeholder="Boîte" required>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('unit')}" th:errors="*{unit}"></div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" for="unitPrice">Prix unitaire (F CFA)</label>
+                        <input type="number" step="0.01" min="0" class="form-control" id="unitPrice" th:field="*{unitPrice}">
+                        <div class="text-danger small" th:if="${#fields.hasErrors('unitPrice')}" th:errors="*{unitPrice}"></div>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex justify-content-end gap-2">
+                    <a th:href="@{/products}" class="btn btn-secondary">Annuler</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>Enregistrer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

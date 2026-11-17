@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="info-box(icon, bgClass, title, value)" th:class="'small-box ' + ${bgClass}">
+    <div class="inner">
+        <h3 th:text="${value}">0</h3>
+        <p th:text="${title}">Titre</p>
+    </div>
+    <div class="small-box-icon">
+        <i th:class="${icon}"></i>
+    </div>
+</div>
+</body>
+</html>
