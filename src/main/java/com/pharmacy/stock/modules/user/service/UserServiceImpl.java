@@ -4,12 +4,14 @@ import com.pharmacy.stock.common.exception.BusinessException;
 import com.pharmacy.stock.modules.entity.entity.StructureEntity;
 import com.pharmacy.stock.modules.entity.repository.StructureEntityRepository;
 import com.pharmacy.stock.modules.entity.entity.StructureEntity;
+import com.pharmacy.stock.modules.user.dto.ChangePasswordFormDto;
 import com.pharmacy.stock.modules.user.dto.UserDto;
 import com.pharmacy.stock.modules.user.dto.UserFormDto;
 import com.pharmacy.stock.modules.user.entity.Role;
 import com.pharmacy.stock.modules.user.entity.User;
 import com.pharmacy.stock.modules.user.repository.RoleRepository;
 import com.pharmacy.stock.modules.user.repository.UserRepository;
+import com.pharmacy.stock.modules.user.security.RoleNames;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -52,6 +54,9 @@ public class UserServiceImpl implements UserService {
         if (userRepository.existsByUsername(form.getUsername())) {
             throw new BusinessException("Un utilisateur existe déjà avec l'identifiant : " + form.getUsername());
         }
+        if (!StringUtils.hasText(form.getPassword())) {
+            throw new BusinessException("Le mot de passe est obligatoire à la création du compte.");
+        }
         User user = new User();
         applyForm(user, form);
         user.setPasswordHash(passwordEncoder.encode(form.getPassword()));
@@ -82,11 +87,32 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public UserDto toggleActive(Long id) {
+    public UserDto toggleActive(Long id, Long currentUserId) {
+        if (id.equals(currentUserId)) {
+            throw new BusinessException("Vous ne pouvez pas désactiver votre propre compte.");
+        }
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Utilisateur introuvable : id=" + id));
+        if (Boolean.TRUE.equals(user.getIsActive())
+                && RoleNames.ADMIN.equals(user.getRole().getName())
+                && userRepository.countByRoleNameAndIsActiveTrueAndIdNot(RoleNames.ADMIN, id) == 0) {
+            throw new BusinessException("Impossible de désactiver le dernier compte administrateur actif.");
+        }
         user.setIsActive(!Boolean.TRUE.equals(user.getIsActive()));
         return toDto(userRepository.save(user));
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(Long userId, ChangePasswordFormDto form) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("Utilisateur introuvable : id=" + userId));
+        if (!passwordEncoder.matches(form.getCurrentPassword(), user.getPasswordHash())) {
+            throw new BusinessException("Le mot de passe actuel est incorrect.");
+        }
+        user.setPasswordHash(passwordEncoder.encode(form.getNewPassword()));
+        user.setMustChangePassword(false);
+        userRepository.save(user);
     }
 
     @Override

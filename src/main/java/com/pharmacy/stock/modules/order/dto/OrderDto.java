@@ -6,11 +6,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * En-tête de commande en lecture (demande ou commande).
+ * Commande fournisseur en lecture (passée par la DAAS, validée par la DBI,
+ * réceptionnée par le Dépôt Central).
  */
 @Getter
 @Setter
@@ -28,19 +30,39 @@ public class OrderDto extends BaseDto {
 
     private String sourceEntityName;
 
-    private Long targetEntityId;
+    private Long supplierEntityId;
 
-    private String targetEntityCode;
+    private String supplierEntityCode;
 
-    private String targetEntityName;
+    private String supplierEntityName;
 
-    private String targetEntityType;
+    private Long receivingEntityId;
+
+    private String receivingEntityCode;
+
+    private String receivingEntityName;
+
+    private Long supplyRequestId;
+
+    private String supplyRequestNumber;
 
     private String status;
 
-    private Boolean requiresDbiValidation;
+    private BigDecimal totalAmount;
+
+    private String rejectionReason;
 
     private String createdByName;
+
+    private String validatedByName;
+
+    private LocalDateTime validatedAt;
+
+    private LocalDateTime sentAt;
+
+    private String receivedByName;
+
+    private LocalDateTime receivedAt;
 
     private LocalDateTime createdAt;
 

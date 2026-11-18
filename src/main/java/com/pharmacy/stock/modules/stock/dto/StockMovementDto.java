@@ -39,6 +39,12 @@ public class StockMovementDto extends BaseDto {
 
     private Integer stockAfter;
 
+    /** Numéro de la commande fournisseur liée (réception au DC), null sinon. */
+    private String referenceOrderNumber;
+
+    /** Numéro de la demande d'approvisionnement liée, null sinon. */
+    private String referenceSupplyRequestNumber;
+
     private String createdByName;
 
     private LocalDateTime createdAt;

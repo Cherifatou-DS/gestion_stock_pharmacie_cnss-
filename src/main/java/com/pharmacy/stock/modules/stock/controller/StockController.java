@@ -1,6 +1,7 @@
 package com.pharmacy.stock.modules.stock.controller;
 
 import com.pharmacy.stock.common.exception.BusinessException;
+import com.pharmacy.stock.common.util.ClientIpResolver;
 import com.pharmacy.stock.modules.audit.service.AuditService;
 import com.pharmacy.stock.modules.entity.service.StructureEntityService;
 import com.pharmacy.stock.modules.product.service.ProductService;
@@ -9,6 +10,7 @@ import com.pharmacy.stock.modules.stock.dto.StockThresholdFormDto;
 import com.pharmacy.stock.modules.stock.entity.StockMovementType;
 import com.pharmacy.stock.modules.stock.service.StockService;
 import com.pharmacy.stock.modules.user.security.CustomUserDetails;
+import com.pharmacy.stock.modules.user.security.RoleNames;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,7 @@ public class StockController {
     private final StructureEntityService structureEntityService;
     private final ProductService productService;
     private final AuditService auditService;
+    private final ClientIpResolver clientIpResolver;
 
     @GetMapping
     public String list(@RequestParam(required = false) Long entityId,
@@ -46,7 +49,7 @@ public class StockController {
                        @AuthenticationPrincipal CustomUserDetails currentUser,
                        Model model) {
         // Les utilisateurs hors administration sont limités à la consultation de leur structure.
-        boolean restricted = isRestrictedToOwnEntity(currentUser);
+        boolean restricted = RoleNames.isRestrictedToOwnEntity(currentUser.getRole());
         Long effectiveEntityId = restricted ? currentUser.getEntityId() : entityId;
 
         model.addAttribute("stocks", stockService.findStocks(effectiveEntityId, lowStockOnly));
@@ -83,15 +86,21 @@ public class StockController {
             model.addAttribute("stock", stock);
             return "pages/stocks/threshold-form";
         }
-        var updated = stockService.updateThreshold(id, form);
-        auditService.record(currentUser.getId(), "MODIFICATION", "STOCKS", id,
-                "Mise à jour du seuil d'alerte du stock " + stock.getEntityCode() + " / "
-                        + stock.getProductCode() + " : " + stock.getMinThreshold() + " -> "
-                        + updated.getMinThreshold(),
-                request.getRemoteAddr());
-        redirectAttributes.addFlashAttribute("message",
-                "Seuil d'alerte mis à jour pour le produit " + stock.getProductCode() + ".");
-        return "redirect:/stocks";
+        try {
+            var updated = stockService.updateThreshold(id, form, currentUser.getRole());
+            auditService.record(currentUser.getId(), "MODIFICATION", "STOCKS", id,
+                    "Mise à jour du seuil d'alerte du stock " + stock.getEntityCode() + " / "
+                            + stock.getProductCode() + " : " + stock.getMinThreshold() + " -> "
+                            + updated.getMinThreshold(),
+                    clientIpResolver.resolve(request));
+            redirectAttributes.addFlashAttribute("message",
+                    "Seuil d'alerte mis à jour pour le produit " + stock.getProductCode() + ".");
+            return "redirect:/stocks";
+        } catch (BusinessException e) {
+            model.addAttribute("stock", stock);
+            model.addAttribute("error", e.getMessage());
+            return "pages/stocks/threshold-form";
+        }
     }
 
     @GetMapping("/movements")
@@ -100,7 +109,7 @@ public class StockController {
                             @RequestParam(required = false) String type,
                             @AuthenticationPrincipal CustomUserDetails currentUser,
                             Model model) {
-        boolean restricted = isRestrictedToOwnEntity(currentUser);
+        boolean restricted = RoleNames.isRestrictedToOwnEntity(currentUser.getRole());
         Long effectiveEntityId = restricted ? currentUser.getEntityId() : entityId;
 
         model.addAttribute("movements", stockService.findMovements(effectiveEntityId, productId, type));
@@ -147,12 +156,13 @@ public class StockController {
             return "pages/stocks/movement-form";
         }
         try {
-            var movement = stockService.recordMovement(form, currentUser.getId());
+            var movement = stockService.recordUserMovement(form, currentUser.getId(),
+                    currentUser.getRole(), currentUser.getEntityId());
             auditService.record(currentUser.getId(), "MOUVEMENT_STOCK", "STOCK_MOVEMENTS", movement.getId(),
                     movement.getType() + " de " + movement.getQuantity() + " " + movement.getProductCode()
                             + " sur la structure " + movement.getEntityCode()
                             + " (stock : " + movement.getStockBefore() + " -> " + movement.getStockAfter() + ")",
-                    request.getRemoteAddr());
+                    clientIpResolver.resolve(request));
             redirectAttributes.addFlashAttribute("message",
                     "Mouvement enregistré : stock de " + movement.getProductCode() + " passé de "
                             + movement.getStockBefore() + " à " + movement.getStockAfter() + ".");
@@ -168,11 +178,7 @@ public class StockController {
 
     /**
      * Les rôles centres médicaux ne consultent que le stock de leur propre structure.
+     * (Règle centralisée dans {@link RoleNames} ; contrôle d'écriture renforcé
+     * côté service via recordUserMovement / updateThreshold.)
      */
-    private boolean isRestrictedToOwnEntity(CustomUserDetails currentUser) {
-        return !"ADMIN".equals(currentUser.getRole())
-                && !"RESPONSABLE_PHARMACIE".equals(currentUser.getRole())
-                && !"RESPONSABLE_DEPOT".equals(currentUser.getRole())
-                && !"MAGASINIER".equals(currentUser.getRole());
-    }
 }

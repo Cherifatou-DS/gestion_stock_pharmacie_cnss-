@@ -1,17 +1,22 @@
 package com.pharmacy.stock.modules.order.entity;
 
 /**
- * Statuts du circuit de validation des commandes (colonne status de la table orders).
+ * Statuts du circuit des commandes fournisseurs passees par la DAAS
+ * (colonne status de la table orders).
+ *
+ * Circuit : BROUILLON -> EN_ATTENTE_DBI -> (AJUSTEE_DBI) -> VALIDEE_DBI
+ *           -> ENVOYEE_FOURNISSEUR -> (RECUE_PARTIELLEMENT) -> RECUE.
+ * La validation DBI est systematique ; seul le Depot Central receptionne.
  */
 public enum OrderStatus {
 
     BROUILLON("Brouillon", "bg-secondary"),
-    EN_ATTENTE_SERVIE("En attente de service (PC)", "bg-blue"),
     EN_ATTENTE_DBI("En attente de validation DBI", "bg-danger"),
     AJUSTEE_DBI("Ajustée par la DBI", "bg-warning text-dark"),
     VALIDEE_DBI("Validée par la DBI", "bg-success"),
-    EXPEDIEE("Expédiée", "bg-info text-dark"),
-    LIVREE("Livrée", "bg-success"),
+    ENVOYEE_FOURNISSEUR("Envoyée au fournisseur", "bg-info text-dark"),
+    RECUE_PARTIELLEMENT("Reçue partiellement", "bg-warning text-dark"),
+    RECUE("Reçue", "bg-success"),
     REJETEE("Rejetée", "bg-danger");
 
     private final String label;

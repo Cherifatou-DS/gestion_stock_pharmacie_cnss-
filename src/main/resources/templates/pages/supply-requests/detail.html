@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Demande d'approvisionnement - Détail</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0"><i class="bi bi-box-arrow-in-down me-2"></i>Demande d'approvisionnement
+            <span class="badge bg-navy" th:text="${request.requestNumber}">DEM-2026-0001</span></h2>
+        <a th:href="@{/supply-requests}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Retour à la liste
+        </a>
+    </div>
+
+    <div th:replace="~{fragments/components/alerts :: alert-success(${message})}"></div>
+    <div th:replace="~{fragments/components/alerts :: alert-danger(${error})}"></div>
+
+    <div class="row g-3">
+        <!-- En-tête -->
+        <div class="col-lg-4">
+            <div class="card card-white shadow-sm">
+                <div class="card-header"><h3 class="card-title">Informations</h3></div>
+                <div class="card-body">
+                    <dl class="mb-0">
+                        <dt class="small text-muted">Structure demandeuse</dt>
+                        <dd th:text="${request.requestingEntityCode + ' - ' + request.requestingEntityName}">CM01</dd>
+                        <dt class="small text-muted">Structure sollicitée</dt>
+                        <dd th:text="${request.supplyingEntityCode + ' - ' + request.supplyingEntityName}">PC</dd>
+                        <dt class="small text-muted">Statut</dt>
+                        <dd th:replace="~{fragments/components/badges :: supply-request-status-badge(${request.status})}">STATUT</dd>
+                        <dt class="small text-muted">Créée par</dt>
+                        <dd th:text="${request.createdByName}">Chef CM01</dd>
+                        <dt class="small text-muted" th:if="${request.processedByName != null}">Traitée par</dt>
+                        <dd th:if="${request.processedByName != null}" th:text="${request.processedByName}">—</dd>
+                        <dt class="small text-muted" th:if="${request.rejectionReason != null}">Motif du rejet</dt>
+                        <dd th:if="${request.rejectionReason != null}">
+                            <span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i><span
+                                    th:text="${request.rejectionReason}">Motif</span></span>
+                        </dd>
+                        <div th:if="${request.isDaasCircuit()}" class="alert alert-info small mt-2 mb-0">
+                            <i class="bi bi-info-circle me-1"></i>Circuit DC → DAAS : cette demande est traitée par la
+                            DAAS via une <a th:href="@{/orders}">commande fournisseur</a>.
+                            Elle sera clôturée à la réception des marchandises au Dépôt Central.
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Actions contextuelles -->
+            <div class="card card-white shadow-sm mt-3">
+                <div class="card-header"><h3 class="card-title">Actions</h3></div>
+                <div class="card-body d-grid gap-2">
+                    <div th:if="${canSubmit}" class="text-center text-muted small">
+                        Soumettez la demande à la structure sollicitée.
+                    </div>
+                    <form th:if="${canSubmit}" th:action="@{/supply-requests/{id}/submit(id=${request.id})}" method="post">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-send me-1"></i>Soumettre la demande
+                        </button>
+                    </form>
+                    <form th:if="${canTakeCharge}" th:action="@{/supply-requests/{id}/take-charge(id=${request.id})}" method="post">
+                        <button type="submit" class="btn btn-info w-100">
+                            <i class="bi bi-hand-thumbs-up me-1"></i>Prendre en charge
+                        </button>
+                    </form>
+                    <div th:if="${canShip}" class="text-center text-muted small">
+                        Expédition : saisissez les quantités accordées ci-contre.
+                    </div>
+                    <div th:if="${canAwaitOrder}" class="alert alert-warning small mb-0">
+                        <i class="bi bi-cart3 me-1"></i>Traitez cette demande en émettant une
+                        <a th:href="@{/orders/new}">commande fournisseur</a> liée à la demande.
+                    </div>
+                    <form th:if="${canConfirmDelivery}" th:action="@{/supply-requests/{id}/confirm-delivery(id=${request.id})}" method="post">
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="bi bi-download me-1"></i>Confirmer la livraison (crédit stock)
+                        </button>
+                    </form>
+                    <form th:if="${canReject}" th:action="@{/supply-requests/{id}/reject(id=${request.id})}"
+                          th:object="${processForm}" method="post">
+                        <textarea class="form-control form-control-sm mb-2" rows="2"
+                                  th:field="*{rejectionReason}"
+                                  placeholder="Motif du rejet (obligatoire)"></textarea>
+                        <button type="submit" class="btn btn-danger w-100">
+                            <i class="bi bi-x-circle me-1"></i>Rejeter
+                        </button>
+                    </form>
+                    <div th:if="${!canSubmit and !canTakeCharge and !canReject and !canShip and !canConfirmDelivery and !canAwaitOrder}"
+                         class="text-center text-muted small">
+                        <i class="bi bi-lock me-1"></i>Aucune action disponible pour votre rôle à ce stade du circuit.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lignes de la demande -->
+        <div class="col-lg-8">
+            <div class="card card-white shadow-sm">
+                <div class="card-header"><h3 class="card-title">Lignes de la demande</h3></div>
+                <div class="card-body table-responsive">
+                    <table class="table table-bordered table-striped align-middle">
+                        <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Désignation</th>
+                            <th class="text-center">Qté demandée</th>
+                            <th class="text-center">Qté accordée</th>
+                            <th class="text-center">Qté livrée</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="item : ${request.items}">
+                            <td><span class="badge bg-blue" th:text="${item.productCode}">MED001</span></td>
+                            <td th:text="${item.productDesignation}">Paracétamol 500mg</td>
+                            <td class="text-center" th:text="${item.quantityRequested}">50</td>
+                            <td class="text-center"
+                                th:text="${item.quantityApproved != null} ? ${item.quantityApproved} : '—'">—</td>
+                            <td class="text-center fw-bold text-primary"
+                                th:text="${item.quantityDelivered != null} ? ${item.quantityDelivered} : 0">0</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Expédition (CM -> PC, PC -> DC uniquement) -->
+            <div class="card card-white shadow-sm mt-3" th:if="${canShip}">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="bi bi-truck me-1"></i>Expédition — quantités accordées
+                        (débit de votre stock)</h3>
+                </div>
+                <div class="card-body">
+                    <form th:action="@{/supply-requests/{id}/ship(id=${request.id})}" th:object="${processForm}"
+                          method="post" novalidate>
+                        <table class="table table-bordered align-middle">
+                            <thead>
+                            <tr>
+                                <th>Produit</th>
+                                <th class="text-center">Qté demandée</th>
+                                <th class="text-center" style="width: 180px;">Quantité accordée</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="item, stat : ${request.items}">
+                                <td th:text="${item.productCode + ' - ' + item.productDesignation}">MED001</td>
+                                <td class="text-center" th:text="${item.quantityRequested}">50</td>
+                                <td>
+                                    <input type="hidden" th:name="|approvals[${stat.index}].itemId|"
+                                           th:value="${item.id}">
+                                    <input type="number" min="0" th:max="${item.quantityRequested}"
+                                           class="form-control form-control-sm"
+                                           th:name="|approvals[${stat.index}].approvedQuantity|"
+                                           th:value="${item.quantityRequested}">
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <div class="form-text mb-2">
+                            La quantité accordée peut être inférieure à la quantité demandée.
+                            L'expédition débite le stock de votre structure et valorise la sortie
+                            dans le suivi financier DBI.
+                        </div>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-truck me-1"></i>Expédier la demande
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

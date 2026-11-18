@@ -18,4 +18,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * Utilisateurs actifs rattachés à une structure (contrôle avant désactivation).
      */
     long countByEntityIdAndIsActiveTrue(Long entityId);
+
+    /**
+     * Administrateurs actifs autres que celui désigné (contrôle "dernier admin").
+     */
+    long countByRoleNameAndIsActiveTrueAndIdNot(String roleName, Long id);
 }

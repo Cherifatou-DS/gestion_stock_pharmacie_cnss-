@@ -1,6 +1,7 @@
 package com.pharmacy.stock.modules.product.controller;
 
 import com.pharmacy.stock.common.exception.BusinessException;
+import com.pharmacy.stock.common.util.ClientIpResolver;
 import com.pharmacy.stock.modules.audit.service.AuditService;
 import com.pharmacy.stock.modules.product.dto.ProductDto;
 import com.pharmacy.stock.modules.product.dto.ProductFormDto;
@@ -31,6 +32,7 @@ public class ProductController {
 
     private final ProductService productService;
     private final AuditService auditService;
+    private final ClientIpResolver clientIpResolver;
 
     @GetMapping
     public String list(@RequestParam(required = false) String keyword, Model model) {
@@ -59,7 +61,7 @@ public class ProductController {
             ProductDto created = productService.createProduct(form);
             auditService.record(currentUser.getId(), "CREATION", "PRODUCTS", created.getId(),
                     "Création du produit " + created.getCode() + " (" + created.getDesignation() + ")",
-                    request.getRemoteAddr());
+                    clientIpResolver.resolve(request));
             redirectAttributes.addFlashAttribute("message",
                     "Produit " + created.getCode() + " ajouté au catalogue avec succès.");
             return "redirect:/products";
@@ -99,7 +101,7 @@ public class ProductController {
             ProductDto updated = productService.updateProduct(id, form);
             auditService.record(currentUser.getId(), "MODIFICATION", "PRODUCTS", id,
                     "Modification du produit " + updated.getCode() + " (" + updated.getDesignation() + ")",
-                    request.getRemoteAddr());
+                    clientIpResolver.resolve(request));
             redirectAttributes.addFlashAttribute("message",
                     "Produit " + updated.getCode() + " mis à jour avec succès.");
             return "redirect:/products";

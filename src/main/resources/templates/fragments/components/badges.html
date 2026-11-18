@@ -1,18 +1,34 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
+<!-- Badge générique (statut brut) -->
 <span th:fragment="badge(status)" class="badge"
-      th:classappend="${status == 'VALIDEE_DBI' or status == 'LIVREE'} ? 'bg-success' : (${status == 'EN_ATTENTE_DBI' or status == 'REJETEE'} ? 'bg-danger' : (${status == 'EN_ATTENTE_SERVIE'} ? 'bg-blue' : (${status == 'AJUSTEE_DBI'} ? 'bg-warning' : (${status == 'EXPEDIEE'} ? 'bg-info' : 'bg-secondary'))))"
+      th:classappend="${status == 'VALIDEE_DBI' or status == 'LIVREE' or status == 'RECUE'} ? 'bg-success' : (${status == 'EN_ATTENTE_DBI' or status == 'REJETEE'} ? 'bg-danger' : (${status == 'SOUMISE'} ? 'bg-blue' : (${status == 'AJUSTEE_DBI' or status == 'RECUE_PARTIELLEMENT' or status == 'EXPEDIEE'} ? 'bg-warning' : (${status == 'ENVOYEE_FOURNISSEUR' or status == 'EN_COURS_TRAITEMENT'} ? 'bg-info' : 'bg-secondary'))))"
       th:text="${status}">STATUT</span>
 
+<!-- Badge des statuts des commandes fournisseurs (circuit DAAS -> DBI -> DC) -->
 <span th:fragment="order-status-badge(status)" class="badge"
-      th:classappend="${status == 'VALIDEE_DBI' or status == 'LIVREE'} ? 'bg-success' : (${status == 'EN_ATTENTE_DBI' or status == 'REJETEE'} ? 'bg-danger' : (${status == 'EN_ATTENTE_SERVIE'} ? 'bg-blue' : (${status == 'AJUSTEE_DBI'} ? 'bg-warning' : (${status == 'EXPEDIEE'} ? 'bg-info' : 'bg-secondary'))))"
+      th:classappend="${status == 'VALIDEE_DBI' or status == 'RECUE'} ? 'bg-success' : (${status == 'EN_ATTENTE_DBI' or status == 'REJETEE'} ? 'bg-danger' : (${status == 'AJUSTEE_DBI' or status == 'RECUE_PARTIELLEMENT'} ? 'bg-warning' : (${status == 'ENVOYEE_FOURNISSEUR'} ? 'bg-info' : 'bg-secondary')))"
       th:text="${status == 'BROUILLON'} ? 'Brouillon' :
-              (${status == 'EN_ATTENTE_SERVIE'} ? 'En attente de service (PC)' :
               (${status == 'EN_ATTENTE_DBI'} ? 'En attente de validation DBI' :
               (${status == 'AJUSTEE_DBI'} ? 'Ajustée par la DBI' :
               (${status == 'VALIDEE_DBI'} ? 'Validée par la DBI' :
+              (${status == 'ENVOYEE_FOURNISSEUR'} ? 'Envoyée au fournisseur' :
+              (${status == 'RECUE_PARTIELLEMENT'} ? 'Reçue partiellement' :
+              (${status == 'RECUE'} ? 'Reçue' : 'Rejetée'))))))">STATUT</span>
+
+<!-- Badge des statuts des demandes d'approvisionnement (CM -> PC, PC -> DC, DC -> DAAS) -->
+<span th:fragment="supply-request-status-badge(status)" class="badge"
+      th:classappend="${status == 'LIVREE'} ? 'bg-success' : (${status == 'REJETEE'} ? 'bg-danger' : (${status == 'SOUMISE'} ? 'bg-blue' : (${status == 'EXPEDIEE'} ? 'bg-warning' : (${status == 'EN_COURS_TRAITEMENT'} ? 'bg-info' : 'bg-secondary'))))"
+      th:text="${status == 'BROUILLON'} ? 'Brouillon' :
+              (${status == 'SOUMISE'} ? 'Soumise' :
+              (${status == 'EN_COURS_TRAITEMENT'} ? 'En cours de traitement' :
               (${status == 'EXPEDIEE'} ? 'Expédiée' :
-              (${status == 'LIVREE'} ? 'Livrée' : 'Rejetée'))))))">STATUT</span>
+              (${status == 'LIVREE'} ? 'Livrée' : 'Rejetée'))))">STATUT</span>
+
+<!-- Badge des types de transaction financière (suivi DBI) -->
+<span th:fragment="transaction-type-badge(type)" class="badge"
+      th:classappend="${type == 'ENGAGEMENT_FOURNISSEUR'} ? 'bg-blue' : 'bg-danger'"
+      th:text="${type == 'ENGAGEMENT_FOURNISSEUR'} ? 'Engagement fournisseur' : 'Sortie de stock valorisée'">TYPE</span>
 </body>
 </html>

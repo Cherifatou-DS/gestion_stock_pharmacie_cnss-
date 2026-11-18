@@ -120,12 +120,6 @@
                         </a>
                     </td>
                 </tr>
-                <tr th:if="${#lists.isEmpty(stocks)}">
-                    <td colspan="7" class="text-center text-muted py-4">
-                        Aucune ligne de stock. Les stocks se créent automatiquement lors du premier mouvement
-                        (entrée ou ajustement d'inventaire).
-                    </td>
-                </tr>
                 </tbody>
             </table>
         </div>
@@ -136,7 +130,8 @@
     $(function () {
         $('#stocks-table').DataTable({
             language: {
-                url: '/plugins/datatables/i18n/fr-FR.json'
+                url: '/plugins/datatables/i18n/fr-FR.json',
+                emptyTable: 'Aucune ligne de stock. Les stocks se créent automatiquement lors du premier mouvement.'
             },
             responsive: true,
             pageLength: 10,

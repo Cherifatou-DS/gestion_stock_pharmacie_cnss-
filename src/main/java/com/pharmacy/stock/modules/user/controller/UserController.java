@@ -1,6 +1,7 @@
 package com.pharmacy.stock.modules.user.controller;
 
 import com.pharmacy.stock.common.exception.BusinessException;
+import com.pharmacy.stock.common.util.ClientIpResolver;
 import com.pharmacy.stock.modules.audit.service.AuditService;
 import com.pharmacy.stock.modules.entity.service.StructureEntityService;
 import com.pharmacy.stock.modules.user.dto.UserDto;
@@ -34,6 +35,7 @@ public class UserController {
     private final RoleService roleService;
     private final StructureEntityService structureEntityService;
     private final AuditService auditService;
+    private final ClientIpResolver clientIpResolver;
 
     @GetMapping
     public String list(Model model) {
@@ -64,7 +66,7 @@ public class UserController {
         try {
             UserDto created = userService.createUser(form);
             auditService.record(currentUser.getId(), "CREATION", "USERS", created.getId(),
-                    "Création de l'utilisateur " + created.getUsername(), request.getRemoteAddr());
+                    "Création de l'utilisateur " + created.getUsername(), clientIpResolver.resolve(request));
             redirectAttributes.addFlashAttribute("message", "Utilisateur " + created.getUsername() + " créé avec succès.");
             return "redirect:/users";
         } catch (BusinessException e) {
@@ -111,7 +113,7 @@ public class UserController {
         try {
             UserDto updated = userService.updateUser(id, form);
             auditService.record(currentUser.getId(), "MODIFICATION", "USERS", id,
-                    "Modification de l'utilisateur " + updated.getUsername(), request.getRemoteAddr());
+                    "Modification de l'utilisateur " + updated.getUsername(), clientIpResolver.resolve(request));
             redirectAttributes.addFlashAttribute("message", "Utilisateur mis à jour avec succès.");
             return "redirect:/users";
         } catch (BusinessException e) {
@@ -128,13 +130,17 @@ public class UserController {
                                @AuthenticationPrincipal CustomUserDetails currentUser,
                                HttpServletRequest request,
                                RedirectAttributes redirectAttributes) {
-        UserDto updated = userService.toggleActive(id);
-        auditService.record(currentUser.getId(), updated.getIsActive() ? "ACTIVATION" : "DESACTIVATION",
-                "USERS", id,
-                (updated.getIsActive() ? "Activation" : "Désactivation") + " de l'utilisateur " + updated.getUsername(),
-                request.getRemoteAddr());
-        redirectAttributes.addFlashAttribute("message",
-                "Compte " + (updated.getIsActive() ? "activé" : "désactivé") + " pour " + updated.getUsername() + ".");
+        try {
+            UserDto updated = userService.toggleActive(id, currentUser.getId());
+            auditService.record(currentUser.getId(), updated.getIsActive() ? "ACTIVATION" : "DESACTIVATION",
+                    "USERS", id,
+                    (updated.getIsActive() ? "Activation" : "Désactivation") + " de l'utilisateur " + updated.getUsername(),
+                    clientIpResolver.resolve(request));
+            redirectAttributes.addFlashAttribute("message",
+                    "Compte " + (updated.getIsActive() ? "activé" : "désactivé") + " pour " + updated.getUsername() + ".");
+        } catch (BusinessException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+        }
         return "redirect:/users";
     }
 }

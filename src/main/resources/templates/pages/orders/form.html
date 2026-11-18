@@ -3,11 +3,12 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layouts/main-layout}">
 <head>
-    <title>Commande - Nouvelle demande</title>
+    <title>Commande Fournisseur - Nouvelle</title>
 </head>
 <body>
 <div layout:fragment="content">
-    <h2 class="h5 mb-3"><i class="bi bi-cart-plus me-2"></i>Nouvelle commande</h2>
+    <h2 class="h5 mb-3"><i class="bi bi-cart-plus me-2"></i>Nouvelle commande fournisseur
+        <span class="badge bg-danger">DAAS uniquement</span></h2>
 
     <div th:replace="~{fragments/components/alerts :: alert-danger(${error})}"></div>
 
@@ -18,20 +19,33 @@
         <div class="card-body">
             <form th:action="@{/orders}" th:object="${orderForm}" method="post" novalidate>
                 <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label" for="targetEntityId">Destinataire <span class="text-danger">*</span></label>
-                        <select id="targetEntityId" th:field="*{targetEntityId}" class="form-select" required>
+                    <div class="col-md-5">
+                        <label class="form-label" for="supplierEntityId">Fournisseur <span class="text-danger">*</span></label>
+                        <select id="supplierEntityId" th:field="*{supplierEntityId}" class="form-select" required>
                             <option value="">-- Sélectionner --</option>
-                            <option th:each="entity : ${allowedTargets}" th:value="${entity.id}"
-                                    th:text="${entity.code + ' - ' + entity.name}">PC</option>
+                            <option th:each="supplier : ${suppliers}" th:value="${supplier.id}"
+                                    th:text="${supplier.code + ' - ' + supplier.name}">FRN01</option>
                         </select>
-                        <div class="text-danger small" th:if="${#fields.hasErrors('targetEntityId')}"
-                             th:errors="*{targetEntityId}"></div>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('supplierEntityId')}"
+                             th:errors="*{supplierEntityId}"></div>
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label" for="supplyRequestId">Demande d'approvisionnement liée (DC → DAAS)</label>
+                        <select id="supplyRequestId" th:field="*{supplyRequestId}" class="form-select">
+                            <option value="">-- Aucune (commande autonome) --</option>
+                            <option th:each="req : ${openSupplyRequests}" th:value="${req.id}"
+                                    th:text="${req.requestNumber + ' - ' + req.requestingEntityCode + ' (' + req.items.size() + ' ligne(s))'}">DEM-2026-0001</option>
+                        </select>
                         <div class="form-text">
-                            CM → PC : livraison directe si stock disponible (sans DBI).
-                            Réapprovisionnement : validation DBI obligatoire.
+                            En liant une demande du Dépôt Central, ses lignes préremplissent la commande
+                            et la réception au DC clôturera automatiquement la demande.
                         </div>
                     </div>
+                </div>
+                <div class="alert alert-info small mt-2" th:if="${linkedRequest != null}">
+                    <i class="bi bi-link-45deg me-1"></i>Commande préremplie depuis la demande
+                    <strong th:text="${linkedRequest.requestNumber}">DEM-2026-0001</strong>
+                    (vous pouvez ajuster les lignes avant enregistrement).
                 </div>
 
                 <h4 class="h6 mt-4 mb-2 border-bottom pb-2">Lignes de produits</h4>
@@ -47,6 +61,7 @@
                         <div class="col-md-3">
                             <input type="number" min="1" class="form-control form-control-sm"
                                    th:name="|lines[${stat.index}].quantityRequested|"
+                                   th:value="${line.quantityRequested}"
                                    placeholder="Qté" required>
                         </div>
                         <div class="col-md-2">

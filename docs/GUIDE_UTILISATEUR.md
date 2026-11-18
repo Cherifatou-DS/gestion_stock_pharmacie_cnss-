@@ -3,7 +3,8 @@
 **Système de Gestion Intégrée des Stocks Pharmaceutiques — CNSS**
 
 Ce manuel décrit l'utilisation de l'application pour chaque profil : Chef de Service de Centre Médical,
-Responsable de la Pharmacie Centrale, Responsable du Dépôt Central, Valideur DBI, Magasinier et Administrateur.
+Responsable de la Pharmacie Centrale, Responsable du Dépôt Central, Agent DAAS, Valideur DBI,
+Magasinier et Administrateur.
 
 ---
 
@@ -24,10 +25,10 @@ Une **session inactive** est déconnectée automatiquement ; reconnectez-vous si
 
 Page d'accueil après connexion, elle affiche :
 
-- **Commandes en attente de traitement** — demandes à servir (PC) ou à valider (DBI) ;
-- **Commandes validées à expédier** — en attente d'expédition par le Dépôt Central ;
+- **Demandes d'approvisionnement à traiter** — demandes soumises (CM → PC, PC → DC, DC → DAAS) ;
+- **Commandes en attente de validation DBI** — commandes fournisseurs de la DAAS à examiner ;
+- **Commandes validées à transmettre au fournisseur** — en attente de transmission par la DAAS ;
 - **Produits en alerte de stock** — quantité au niveau ou en dessous du seuil d'alerte (rouge) ;
-- **Produits au catalogue** — nombre total de références ;
 - **Dernières commandes**, **Alertes de stock** et **Dernières actions journalisées**.
 
 Chaque carte est un lien direct vers le module correspondant.
@@ -43,6 +44,7 @@ Chaque carte est un lien direct vers le module correspondant.
 | `resp_depot` | Responsable Dépôt Central | DC |
 | `chef_cm01` | Chef de Service | Centre Médical 1 |
 | `agent_cm02` | Agent d'approvisionnement | Centre Médical 2 |
+| `agent_daas` | Agent DAAS | DAAS |
 | `dbi_valideur` | Valideur DBI | DBI |
 | `magasinier` | Magasinier | DC |
 
@@ -60,7 +62,7 @@ Chaque carte est un lien direct vers le module correspondant.
 
 ## 5. Structures et utilisateurs (Administrateur)
 
-- **Structures** : gestion des entités (Centres Médicaux, Pharmacie Centrale, Dépôt Central, DBI, Fournisseur).
+- **Structures** : gestion des entités (Centres Médicaux, Pharmacie Centrale, Dépôt Central, DBI, DAAS, Fournisseur).
   Bouton **Nouvelle structure** : saisissez un **code** unique (lettres/chiffres, ex. `CM03`), le **nom** de la
   structure et son **type**, puis *Créer la structure*. Le code est converti en majuscules ; un doublon est
   signalé par un message d'erreur.
@@ -89,50 +91,97 @@ Chaque carte est un lien direct vers le module correspondant.
 
 ---
 
-## 7. Circuit des commandes
+## 7. Demandes d'approvisionnement et commandes fournisseurs
 
-Deux processus existent selon le circuit :
+À partir de la v1.2, la terminologie métier distingue clairement :
 
-### 7.1 Processus A — Demande directe CM → PC (stock disponible)
-1. **Centre Médical** : *Commandes → Nouvelle commande*, destinataire **Pharmacie Centrale**, ajoutez les lignes (produit + quantité) → la commande est créée en **Brouillon**.
-2. Cliquez **Soumettre la commande** → statut **En attente de service (PC)**.
-3. **Pharmacie Centrale** : ouvrez la commande puis **Valider et délivrer** :
-   - le stock de la PC est **débité automatiquement** ;
-   - la commande passe en **Livrée**.
-   - Si le stock est insuffisant, la PC peut **Rejeter** la demande (le CM devra refaire une demande après réapprovisionnement), ou lancer une commande de réappro vers le DC (processus B).
+- **Demande d'approvisionnement** (`supply_requests`) : toute demande de produits **entre entités
+  internes** — CM → PC, PC → DC, DC → DAAS. Menu *Demandes d'approvisionnement*.
+- **Commande fournisseur** (`orders`) : l'acte d'achat passé **exclusivement par la DAAS** auprès
+  d'un **fournisseur** pour approvisionner le Dépôt Central, sous **validation DBI systématique**.
+  Menu *Commandes Fournisseurs*.
 
-### 7.2 Processus B — Réapprovisionnement avec validation DBI
-1. **Pharmacie Centrale** : *Nouvelle commande*, destinataire **Dépôt Central** → *Soumettre* → **En attente de validation DBI**.
-2. **DBI** : ouvre la commande et peut :
+### 7.1 Circuit des demandes d'approvisionnement (CM → PC, PC → DC, DC → DAAS)
+
+1. **Entité demandeuse** (CM / PC / DC) : *Demandes d'approvisionnement → Nouvelle demande*,
+   choisissez la structure sollicitée (les relations autorisées sont strictement CM → PC, PC → DC,
+   DC → DAAS) et les lignes de produits → **Brouillon**.
+2. **Soumettre** → **Soumise**.
+3. **Entité sollicitée** (PC / DC / DAAS) : ouvre la demande puis peut :
+   - **Rejeter** (motif obligatoire) → **Rejetée** (terminal) ;
+   - **Prendre en charge** → **En cours de traitement**.
+4. Pour **CM → PC** et **PC → DC** : l'entité sollicitée **Expédie** en saisissant les quantités
+   accordées (peuvent être inférieures aux quantités demandées) :
+   - son stock est **débité** (mouvement SORTIE tracé avec la référence de la demande) ;
+   - la sortie est **valorisée** dans le suivi financier DBI → **Expédiée**.
+5. L'entité demandeuse **Confirme la livraison** → son stock est **crédité** → **Livrée**.
+6. Pour **DC → DAAS** : la demande ne mouvemente pas de stock. La **DAAS** la traite en émettant une
+   **commande fournisseur liée** (§7.2) ; la demande passe automatiquement à **Livrée** lorsque la
+   réception des marchandises au Dépôt Central couvre les quantités demandées.
+
+### 7.2 Circuit des commandes fournisseurs (DAAS uniquement)
+
+1. **DAAS** : *Commandes Fournisseurs → Nouvelle commande* — choisissez le **fournisseur**, une
+   **demande d'approvisionnement DC → DAAS liée** (optionnel ; les lignes sont alors préremplies) et
+   les lignes → **Brouillon**.
+2. **Soumettre à la DBI** → **En attente de validation DBI**. Une commande ne peut jamais être
+   transmise au fournisseur sans validation DBI.
+3. **DBI** : ouvre la commande et peut :
    - **Réajuster les quantités** (par ligne, ≤ quantité demandée) → **Ajustée par la DBI** ;
-   - **Valider** → **Validée par la DBI** ;
-   - **Rejeter** → **Rejetée** (terminal).
-3. **Dépôt Central** : **Expédier** → le stock DC est débité → **Expédiée**.
-4. **Pharmacie Centrale** (structure émettrice) : **Réceptionner** → le stock PC est crédité → **Livrée**.
+   - **Valider** → **Validée par la DBI** : l'**engagement fournisseur** correspondant est
+     automatiquement enregistré dans le suivi financier ;
+   - **Rejeter** (motif obligatoire) → **Rejetée** (terminal).
+4. **DAAS** : **Transmettre au fournisseur** → **Envoyée au fournisseur**.
+5. **Dépôt Central** : **Réception des marchandises** en saisissant les quantités reçues :
+   - réception partielle → **Reçue partiellement** (une réception complémentaire est possible) ;
+   - réception complète → **Reçue** ;
+   - le stock du DC est **crédité** (mouvement ENTREE tracé avec la référence de la commande) et la
+     demande liée éventuelle est mise à jour (clôture à **Livrée** si elle est couverte).
 
-### 7.3 Commande Fournisseur
-1. **Dépôt Central** : *Nouvelle commande*, destinataire **Fournisseur** → *Soumettre* → circuit DBI comme ci-dessus.
-2. Après validation DBI, le Dépôt Central **Réceptionne la livraison fournisseur** → le stock DC est crédité → **Livrée**.
+### 7.3 Suivi financier (DBI)
+
+**Accès :** menu *Suivi Financier (DBI)* — Administrateur et DBI uniquement.
+
+- **Engagements fournisseurs** : totaux et détail des commandes validées (montant = quantités
+  ajustées × prix unitaire du catalogue) ;
+- **Sorties de stock valorisées** : totaux et détail des expéditions de demandes
+  d'approvisionnement ;
+- Filtre par type de transaction.
 
 ### 7.4 Suivi
-- La liste des commandes permet de filtrer par **structure émettrice** et **statut** ;
+- La liste des demandes permet de filtrer par **structure demandeuse** et **statut** ;
+- La liste des commandes permet de filtrer par **fournisseur** et **statut** ;
 - Les Centres Médicaux ne voient que leurs propres demandes ;
-- Les quantités affichées : **demandée**, **ajustée (DBI)**, **livrée**.
+- Les quantités affichées pour une commande : **demandée**, **ajustée (DBI)**, **reçue (DC)**,
+  prix unitaire et total par ligne.
 
 ---
 
 ## 8. Signification des statuts
 
+### Demandes d'approvisionnement
+
 | Statut | Couleur | Signification |
 |---|---|---|
-| Brouillon | Gris | Commande créée, non soumise (modifiable par son auteur) |
-| En attente de service (PC) | Bleu | Demande directe en attente de traitement par la PC |
-| En attente de validation DBI | Rouge | Commande de réappro en attente de la DBI |
-| Ajustée par la DBI | Orange | Quantités réajustées, en attente de validation |
-| Validée par la DBI | Vert | Validée, en attente d'expédition |
-| Expédiée | Bleu clair | Expédiée par le DC, en attente de réception |
-| Livrée | Vert | Traite et terminée |
+| Brouillon | Gris | Demande créée, non soumise |
+| Soumise | Bleu | En attente de traitement par la structure sollicitée |
+| En cours de traitement | Bleu clair | Prise en charge par la structure sollicitée |
+| Expédiée | Orange | Stock débité chez la structure sollicitée, en attente de confirmation |
+| Livrée | Vert | Confirmée par l'entité demandeuse (ou réception DC pour DC → DAAS) |
 | Rejetée | Rouge | Refusée (terminal) |
+
+### Commandes fournisseurs
+
+| Statut | Couleur | Signification |
+|---|---|---|
+| Brouillon | Gris | Commande créée par la DAAS, non soumise |
+| En attente de validation DBI | Rouge | À examiner par la DBI |
+| Ajustée par la DBI | Orange | Quantités réajustées, en attente de validation |
+| Validée par la DBI | Vert | Validée (engagement fournisseur enregistré), à transmettre |
+| Envoyée au fournisseur | Bleu clair | Transmise, en attente de réception au DC |
+| Reçue partiellement | Orange | Réception partielle au Dépôt Central |
+| Reçue | Vert | Réception complète au Dépôt Central |
+| Rejetée | Rouge | Refusée par la DBI (terminal) |
 
 ---
 
@@ -165,13 +214,15 @@ Il doit d'abord exister dans le catalogue (§4).
 
 ## 11. Rappel des droits par module
 
-| Module | ADMIN | Resp. Pharmacie | Resp. Dépôt | Chef Service / Agent | DBI | Magasinier |
+| Module | ADMIN | Resp. Pharmacie | Resp. Dépôt / Magasinier | Chef Service / Agent CM | DAAS | DBI |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
 | Catalogue produits | ✏️ | ✏️ | lecture | — | — | — |
 | Utilisateurs / Structures | ✏️ | — | — | — | — | — |
-| Stocks / mouvements / seuils | ✏️ | ✏️ | ✏️ | lecture (son CM) | — | ✏️ |
-| Commandes (création) | toutes cibles | → DC | → Fournisseur | → PC | lecture | lecture |
-| Commandes (livraison directe) | ✏️ | ✏️ | — | — | — | — |
-| Commandes (ajust./validation DBI) | ✏️ | — | — | — | ✏️ | — |
-| Commandes (expédition / réception fournisseur) | ✏️ | — | ✏️ | — | — | — |
-| Traçabilité | ✏️ | — | — | — | ✏️ | — |
+| Stocks / mouvements / seuils | ✏️ | ✏️ | ✏️ | lecture (son CM) | lecture | — |
+| Demandes d'appro. (création) | toutes | → DC | → DAAS | → PC | — | lecture |
+| Demandes (prise en charge / rejet / expédition) | ✏️ | ✏️ | ✏️ | — | ✏️ (rejet / liaison commande) | — |
+| Demandes (confirmation de livraison) | ✏️ | — | — | ✏️ | — | — |
+| Commandes fournisseurs (création / envoi) | ✏️ | — | réception | — | ✏️ | lecture |
+| Commandes (ajustement / validation / rejet DBI) | ✏️ | — | — | — | — | ✏️ |
+| Suivi financier | lecture | — | — | — | — | ✏️ |
+| Traçabilité | ✏️ | — | — | — | — | ✏️ |

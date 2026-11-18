@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Demande d'approvisionnement - Nouvelle</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <h2 class="h5 mb-3"><i class="bi bi-box-arrow-in-down me-2"></i>Nouvelle demande d'approvisionnement</h2>
+
+    <div th:replace="~{fragments/components/alerts :: alert-danger(${error})}"></div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-header">
+            <h3 class="card-title">Informations de la demande</h3>
+        </div>
+        <div class="card-body">
+            <form th:action="@{/supply-requests}" th:object="${requestForm}" method="post" novalidate>
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label" for="supplyingEntityId">Structure sollicitée <span class="text-danger">*</span></label>
+                        <select id="supplyingEntityId" th:field="*{supplyingEntityId}" class="form-select" required>
+                            <option value="">-- Sélectionner --</option>
+                            <option th:each="entity : ${allowedSuppliers}" th:value="${entity.id}"
+                                    th:text="${entity.code + ' - ' + entity.name}">PC</option>
+                        </select>
+                        <div class="text-danger small" th:if="${#fields.hasErrors('supplyingEntityId')}"
+                             th:errors="*{supplyingEntityId}"></div>
+                        <div class="form-text">
+                            Circuit autorisé : CM → Pharmacie Centrale, PC → Dépôt Central, DC → DAAS.
+                        </div>
+                    </div>
+                </div>
+
+                <h4 class="h6 mt-4 mb-2 border-bottom pb-2">Lignes de produits</h4>
+                <div id="request-lines">
+                    <div class="row g-2 align-items-center mb-2 line-row" th:each="line, stat : *{lines}">
+                        <div class="col-md-7">
+                            <select class="form-select form-select-sm" th:name="|lines[${stat.index}].productId|" required>
+                                <option value="">-- Produit --</option>
+                                <option th:each="product : ${products}" th:value="${product.id}"
+                                        th:text="${product.code + ' - ' + product.designation}">MED001</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="number" min="1" class="form-control form-control-sm"
+                                   th:name="|lines[${stat.index}].quantityRequested|"
+                                   placeholder="Qté demandée" required>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-sm btn-danger remove-line" title="Supprimer la ligne">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-danger small mb-2" th:if="${#fields.hasErrors('lines')}" th:errors="*{lines}"></div>
+                <button type="button" id="add-line" class="btn btn-sm btn-secondary mb-3">
+                    <i class="bi bi-plus-lg me-1"></i>Ajouter une ligne
+                </button>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                    <a th:href="@{/supply-requests}" class="btn btn-secondary">Annuler</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>Créer la demande (Brouillon)
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script layout:fragment="scripts" th:inline="javascript">
+    $(function () {
+        $(document).on('click', '.remove-line', function () {
+            const row = $(this).closest('.line-row');
+            if ($('.line-row').length > 1) {
+                row.remove();
+            } else {
+                row.find('select').val('');
+                row.find('input').val('');
+            }
+        });
+
+        $('#add-line').on('click', function () {
+            const $rows = $('#request-lines .line-row');
+            const $template = $rows.first();
+            const $clone = $template.clone();
+            const index = $rows.length;
+            $clone.find('select').attr('name', 'lines[' + index + '].productId').val('');
+            $clone.find('input').attr('name', 'lines[' + index + '].quantityRequested').val('');
+            $clone.find('option').each(function () {
+                $(this).prop('selected', $(this).is(':first-child'));
+            });
+            $('#request-lines').append($clone);
+        });
+    });
+</script>
+</body>
+</html>

@@ -3,10 +3,13 @@ package com.pharmacy.stock.modules.order.service;
 import com.pharmacy.stock.common.exception.BusinessException;
 import com.pharmacy.stock.modules.entity.entity.StructureEntity;
 import com.pharmacy.stock.modules.entity.repository.StructureEntityRepository;
+import com.pharmacy.stock.modules.finance.service.FinanceService;
 import com.pharmacy.stock.modules.order.dto.OrderAdjustmentFormDto;
 import com.pharmacy.stock.modules.order.dto.OrderAdjustmentLineDto;
 import com.pharmacy.stock.modules.order.dto.OrderFormDto;
 import com.pharmacy.stock.modules.order.dto.OrderLineFormDto;
+import com.pharmacy.stock.modules.order.dto.OrderReceptionFormDto;
+import com.pharmacy.stock.modules.order.dto.OrderReceptionLineDto;
 import com.pharmacy.stock.modules.order.entity.Order;
 import com.pharmacy.stock.modules.order.entity.OrderItem;
 import com.pharmacy.stock.modules.order.entity.OrderStatus;
@@ -15,8 +18,11 @@ import com.pharmacy.stock.modules.product.entity.Product;
 import com.pharmacy.stock.modules.product.repository.ProductRepository;
 import com.pharmacy.stock.modules.stock.dto.StockMovementFormDto;
 import com.pharmacy.stock.modules.stock.repository.StockRepository;
-import com.pharmacy.stock.modules.stock.entity.Stock;
 import com.pharmacy.stock.modules.stock.service.StockService;
+import com.pharmacy.stock.modules.supply.entity.SupplyRequest;
+import com.pharmacy.stock.modules.supply.entity.SupplyRequestItem;
+import com.pharmacy.stock.modules.supply.repository.SupplyRequestRepository;
+import com.pharmacy.stock.modules.supply.service.SupplyRequestService;
 import com.pharmacy.stock.modules.user.entity.User;
 import com.pharmacy.stock.modules.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,19 +36,23 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests unitaires du circuit de validation des commandes (processus A et B).
+ * Tests unitaires du circuit des commandes fournisseurs passees par la DAAS
+ * (specification v1.2) : creation DAAS, validation DBI, transmission fournisseur,
+ * reception au Depot Central.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -60,12 +70,17 @@ class OrderServiceImplTest {
     private StockRepository stockRepository;
     @Mock
     private StockService stockService;
+    @Mock
+    private FinanceService financeService;
+    @Mock
+    private SupplyRequestService supplyRequestService;
+    @Mock
+    private SupplyRequestRepository supplyRequestRepository;
 
     @InjectMocks
     private OrderServiceImpl orderService;
 
-    private StructureEntity cm01;
-    private StructureEntity pc;
+    private StructureEntity daas;
     private StructureEntity dc;
     private StructureEntity fournisseur;
     private Product product;
@@ -73,27 +88,26 @@ class OrderServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        cm01 = new StructureEntity(4L, "CM01", "Centre Médical 1", "CENTRE_MEDICAL", true, null);
-        pc = new StructureEntity(1L, "PC", "Pharmacie Centrale", "PHARMACIE_CENTRALE", true, null);
+        daas = new StructureEntity(7L, "DAAS", "Division des Achats", "DAAS", true, null);
         dc = new StructureEntity(2L, "DC", "Dépôt Central", "DEPOT_CENTRAL", true, null);
         fournisseur = new StructureEntity(6L, "FRN01", "Fournisseur Principal", "FOURNISSEUR", true, null);
         product = new Product(1L, "MED001", "Paracétamol 500mg", "Boîte", BigDecimal.TEN, null);
         author = new User();
         author.setId(1L);
-        author.setUsername("chef_cm01");
-        author.setFirstName("Diallo");
-        author.setLastName("Fatou");
+        author.setUsername("agent_daas");
+        author.setFirstName("Ndiaye");
+        author.setLastName("Sokhna");
     }
 
-    private Order order(Long id, StructureEntity source, StructureEntity target, OrderStatus status,
-                        boolean requiresDbi, Integer quantityAdjusted) {
+    private Order order(Long id, OrderStatus status, Integer quantityAdjusted, Integer quantityReceived) {
         Order order = new Order();
         order.setId(id);
         order.setOrderNumber("CMD-2026-0001");
-        order.setSourceEntity(source);
-        order.setTargetEntity(target);
+        order.setSourceEntity(daas);
+        order.setSupplierEntity(fournisseur);
+        order.setReceivingEntity(dc);
         order.setStatus(status.name());
-        order.setRequiresDbiValidation(requiresDbi);
+        order.setTotalAmount(BigDecimal.ZERO);
         order.setCreatedByUser(author);
         OrderItem item = new OrderItem();
         item.setId(100L);
@@ -101,7 +115,8 @@ class OrderServiceImplTest {
         item.setProduct(product);
         item.setQuantityRequested(40);
         item.setQuantityAdjusted(quantityAdjusted);
-        item.setQuantityDelivered(0);
+        item.setQuantityReceived(quantityReceived);
+        item.setUnitPrice(BigDecimal.TEN);
         order.getOrderItems().add(item);
         return order;
     }
@@ -109,190 +124,90 @@ class OrderServiceImplTest {
     private void stubOrder(Order order) {
         when(orderRepository.findByIdWithDetails(order.getId())).thenReturn(Optional.of(order));
         when(userRepository.findById(1L)).thenReturn(Optional.of(author));
-    }
-
-    private Stock stock(int quantity) {
-        Stock stock = new Stock();
-        stock.setQuantity(quantity);
-        return stock;
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(structureEntityRepository.findByType("DEPOT_CENTRAL")).thenReturn(List.of(dc));
     }
 
     // ------------------------------------------------------------------
-    // Creation
+    // Creation & soumission (DAAS uniquement)
     // ------------------------------------------------------------------
 
     @Test
-    void creation_cm_vers_pc_sans_validation_dbi() {
-        when(structureEntityRepository.findById(4L)).thenReturn(Optional.of(cm01));
-        when(structureEntityRepository.findById(1L)).thenReturn(Optional.of(pc));
+    void creation_par_la_daas_produit_un_brouillon() {
+        when(structureEntityRepository.findById(7L)).thenReturn(Optional.of(daas));
+        when(structureEntityRepository.findById(6L)).thenReturn(Optional.of(fournisseur));
+        when(structureEntityRepository.findByType("DEPOT_CENTRAL")).thenReturn(List.of(dc));
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
         when(userRepository.findById(1L)).thenReturn(Optional.of(author));
         when(orderRepository.findLastOrderNumberOfYear("2026")).thenReturn(null);
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
         OrderFormDto form = new OrderFormDto();
-        form.setTargetEntityId(1L);
+        form.setSupplierEntityId(6L);
         form.getLines().add(new OrderLineFormDto(1L, 20));
 
-        var created = orderService.createOrder(form, 1L, "CHEF_SERVICE", 4L);
+        var created = orderService.createOrder(form, 1L, "DAAS", 7L);
 
         assertThat(created.getStatus()).isEqualTo(OrderStatus.BROUILLON.name());
-        assertThat(created.getRequiresDbiValidation()).isFalse();
+        assertThat(created.getReceivingEntityId()).isEqualTo(2L);
         assertThat(created.getOrderNumber()).isEqualTo("CMD-2026-0001");
+        // Prix unitaire valorise depuis le catalogue produit
+        assertThat(created.getItems().get(0).getUnitPrice()).isEqualByComparingTo(BigDecimal.TEN);
     }
 
     @Test
-    void creation_pc_vers_dci_requiert_la_validation_dbi() {
-        when(structureEntityRepository.findById(1L)).thenReturn(Optional.of(pc));
-        when(structureEntityRepository.findById(2L)).thenReturn(Optional.of(dc));
-        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
-        when(userRepository.findById(1L)).thenReturn(Optional.of(author));
-        when(orderRepository.findLastOrderNumberOfYear("2026")).thenReturn("CMD-2026-0007");
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-
+    void creation_par_un_role_autre_que_daas_est_rejetee() {
         OrderFormDto form = new OrderFormDto();
-        form.setTargetEntityId(2L);
-        form.getLines().add(new OrderLineFormDto(1L, 50));
-
-        var created = orderService.createOrder(form, 1L, "RESPONSABLE_PHARMACIE", 1L);
-
-        assertThat(created.getRequiresDbiValidation()).isTrue();
-        assertThat(created.getOrderNumber()).isEqualTo("CMD-2026-0008");
-    }
-
-    @Test
-    void creation_par_un_cm_vers_le_depot_est_rejetee() {
-        when(structureEntityRepository.findById(4L)).thenReturn(Optional.of(cm01));
-        when(structureEntityRepository.findById(2L)).thenReturn(Optional.of(dc));
-
-        OrderFormDto form = new OrderFormDto();
-        form.setTargetEntityId(2L);
+        form.setSupplierEntityId(6L);
         form.getLines().add(new OrderLineFormDto(1L, 20));
 
         assertThatThrownBy(() -> orderService.createOrder(form, 1L, "CHEF_SERVICE", 4L))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("pas autorisé");
+                .hasMessageContaining("Seule la DAAS");
     }
 
     @Test
-    void creation_sans_ligne_est_rejetee() {
-        when(structureEntityRepository.findById(4L)).thenReturn(Optional.of(cm01));
-        when(structureEntityRepository.findById(1L)).thenReturn(Optional.of(pc));
+    void creation_vers_un_non_fournisseur_est_rejetee() {
+        when(structureEntityRepository.findById(7L)).thenReturn(Optional.of(daas));
+        when(structureEntityRepository.findById(2L)).thenReturn(Optional.of(dc));
 
         OrderFormDto form = new OrderFormDto();
-        form.setTargetEntityId(1L);
-
-        assertThatThrownBy(() -> orderService.createOrder(form, 1L, "CHEF_SERVICE", 4L))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("au moins une ligne");
-    }
-
-    @Test
-    void creation_avec_produit_en_double_est_rejetee() {
-        when(structureEntityRepository.findById(4L)).thenReturn(Optional.of(cm01));
-        when(structureEntityRepository.findById(1L)).thenReturn(Optional.of(pc));
-
-        OrderFormDto form = new OrderFormDto();
-        form.setTargetEntityId(1L);
+        form.setSupplierEntityId(2L);
         form.getLines().add(new OrderLineFormDto(1L, 20));
-        form.getLines().add(new OrderLineFormDto(1L, 5));
 
-        assertThatThrownBy(() -> orderService.createOrder(form, 1L, "CHEF_SERVICE", 4L))
+        assertThatThrownBy(() -> orderService.createOrder(form, 1L, "DAAS", 7L))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("deux fois");
-    }
-
-    // ------------------------------------------------------------------
-    // Soumission
-    // ------------------------------------------------------------------
-
-    @Test
-    void soumission_cm_pc_va_en_attente_de_service() {
-        Order order = order(1L, cm01, pc, OrderStatus.BROUILLON, false, null);
-        stubOrder(order);
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        var submitted = orderService.submitOrder(1L, 1L, "CHEF_SERVICE");
-
-        assertThat(submitted.getStatus()).isEqualTo(OrderStatus.EN_ATTENTE_SERVIE.name());
+                .hasMessageContaining("FOURNISSEUR");
     }
 
     @Test
-    void soumission_pc_dci_va_en_attente_dbi() {
-        Order order = order(1L, pc, dc, OrderStatus.BROUILLON, true, null);
+    void soumission_va_en_attente_dbi() {
+        Order order = order(1L, OrderStatus.BROUILLON, null, 0);
         stubOrder(order);
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var submitted = orderService.submitOrder(1L, 1L, "RESPONSABLE_PHARMACIE");
+        var submitted = orderService.submitOrder(1L, 1L, "DAAS");
 
         assertThat(submitted.getStatus()).isEqualTo(OrderStatus.EN_ATTENTE_DBI.name());
     }
 
     @Test
     void soumission_par_un_autre_utilisateur_est_rejetee() {
-        Order order = order(1L, cm01, pc, OrderStatus.BROUILLON, false, null);
+        Order order = order(1L, OrderStatus.BROUILLON, null, 0);
         stubOrder(order);
 
-        assertThatThrownBy(() -> orderService.submitOrder(1L, 99L, "CHEF_SERVICE"))
+        assertThatThrownBy(() -> orderService.submitOrder(1L, 99L, "DAAS"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("l'auteur");
     }
 
     // ------------------------------------------------------------------
-    // Processus A : livraison directe
+    // Décisions DBI
     // ------------------------------------------------------------------
 
     @Test
-    void livraison_directe_debite_le_stock_de_la_pc() {
-        Order order = order(1L, cm01, pc, OrderStatus.EN_ATTENTE_SERVIE, false, null);
+    void reajustement_dbi_puis_validation_enregistre_l_engagement_fournisseur() {
+        Order order = order(1L, OrderStatus.EN_ATTENTE_DBI, null, 0);
         stubOrder(order);
-        when(stockRepository.findByEntityIdAndProductId(1L, 1L)).thenReturn(Optional.of(stock(50)));
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        var delivered = orderService.deliverOrder(1L, 1L, "RESPONSABLE_PHARMACIE");
-
-        assertThat(delivered.getStatus()).isEqualTo(OrderStatus.LIVREE.name());
-        assertThat(delivered.getItems().get(0).getQuantityDelivered()).isEqualTo(40);
-
-        ArgumentCaptor<StockMovementFormDto> movementCaptor = ArgumentCaptor.forClass(StockMovementFormDto.class);
-        verify(stockService).recordMovement(movementCaptor.capture(), any());
-        assertThat(movementCaptor.getValue().getEntityId()).isEqualTo(1L);
-        assertThat(movementCaptor.getValue().getProductId()).isEqualTo(1L);
-        assertThat(movementCaptor.getValue().getType()).isEqualTo("SORTIE");
-        assertThat(movementCaptor.getValue().getQuantity()).isEqualTo(40);
-    }
-
-    @Test
-    void livraison_directe_impossible_si_stock_insuffisant() {
-        Order order = order(1L, cm01, pc, OrderStatus.EN_ATTENTE_SERVIE, false, null);
-        stubOrder(order);
-        when(stockRepository.findByEntityIdAndProductId(1L, 1L)).thenReturn(Optional.of(stock(10)));
-
-        assertThatThrownBy(() -> orderService.deliverOrder(1L, 1L, "RESPONSABLE_PHARMACIE"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Stock insuffisant");
-        verify(orderRepository, never()).save(any(Order.class));
-    }
-
-    @Test
-    void livraison_directe_interdite_au_circuit_dbi() {
-        Order order = order(1L, pc, dc, OrderStatus.EN_ATTENTE_DBI, true, null);
-        stubOrder(order);
-
-        assertThatThrownBy(() -> orderService.deliverOrder(1L, 1L, "RESPONSABLE_PHARMACIE"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Action non permise");
-    }
-
-    // ------------------------------------------------------------------
-    // Processus B : circuit DBI
-    // ------------------------------------------------------------------
-
-    @Test
-    void reajustement_dbi_puis_validation() {
-        Order order = order(1L, pc, dc, OrderStatus.EN_ATTENTE_DBI, true, null);
-        stubOrder(order);
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
         OrderAdjustmentFormDto form = new OrderAdjustmentFormDto();
         form.getAdjustments().add(new OrderAdjustmentLineDto(100L, 30));
@@ -303,11 +218,15 @@ class OrderServiceImplTest {
 
         var validated = orderService.validateByDbi(1L, 1L, "DBI");
         assertThat(validated.getStatus()).isEqualTo(OrderStatus.VALIDEE_DBI.name());
+        // Engagement : 30 x 10 = 300
+        ArgumentCaptor<BigDecimal> amountCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        verify(financeService).recordSupplierEngagement(eq(1L), amountCaptor.capture(), eq(1L), any());
+        assertThat(amountCaptor.getValue()).isEqualByComparingTo("300");
     }
 
     @Test
     void reajustement_superieur_a_la_demande_est_rejete() {
-        Order order = order(1L, pc, dc, OrderStatus.EN_ATTENTE_DBI, true, null);
+        Order order = order(1L, OrderStatus.EN_ATTENTE_DBI, null, 0);
         stubOrder(order);
 
         OrderAdjustmentFormDto form = new OrderAdjustmentFormDto();
@@ -320,7 +239,7 @@ class OrderServiceImplTest {
 
     @Test
     void validation_dbi_interdite_aux_autres_roles() {
-        Order order = order(1L, pc, dc, OrderStatus.EN_ATTENTE_DBI, true, null);
+        Order order = order(1L, OrderStatus.EN_ATTENTE_DBI, null, 0);
         stubOrder(order);
 
         assertThatThrownBy(() -> orderService.validateByDbi(1L, 1L, "CHEF_SERVICE"))
@@ -329,104 +248,179 @@ class OrderServiceImplTest {
     }
 
     @Test
-    void expedition_debite_le_stock_du_depot_avec_les_quantites_ajustees() {
-        Order order = order(1L, pc, dc, OrderStatus.VALIDEE_DBI, true, 30);
+    void rejet_exige_un_motif() {
+        Order order = order(1L, OrderStatus.EN_ATTENTE_DBI, null, 0);
         stubOrder(order);
-        when(stockRepository.findByEntityIdAndProductId(2L, 1L)).thenReturn(Optional.of(stock(100)));
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var shipped = orderService.shipOrder(1L, 1L, "RESPONSABLE_DEPOT");
-
-        assertThat(shipped.getStatus()).isEqualTo(OrderStatus.EXPEDIEE.name());
-        assertThat(shipped.getItems().get(0).getQuantityDelivered()).isEqualTo(30);
-
-        ArgumentCaptor<StockMovementFormDto> movementCaptor = ArgumentCaptor.forClass(StockMovementFormDto.class);
-        verify(stockService).recordMovement(movementCaptor.capture(), any());
-        assertThat(movementCaptor.getValue().getEntityId()).isEqualTo(2L);
-        assertThat(movementCaptor.getValue().getType()).isEqualTo("SORTIE");
-        assertThat(movementCaptor.getValue().getQuantity()).isEqualTo(30);
-    }
-
-    @Test
-    void expedition_impossible_si_stock_depot_insuffisant() {
-        Order order = order(1L, pc, dc, OrderStatus.VALIDEE_DBI, true, 30);
-        stubOrder(order);
-        when(stockRepository.findByEntityIdAndProductId(2L, 1L)).thenReturn(Optional.of(stock(5)));
-
-        assertThatThrownBy(() -> orderService.shipOrder(1L, 1L, "RESPONSABLE_DEPOT"))
+        assertThatThrownBy(() -> orderService.rejectOrder(1L, "  ", 1L, "DBI"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Stock insuffisant");
-    }
+                .hasMessageContaining("motif");
 
-    @Test
-    void reception_de_lexpedition_credite_le_stock_de_lemetteur() {
-        Order order = order(1L, pc, dc, OrderStatus.EXPEDIEE, true, null);
-        order.getOrderItems().get(0).setQuantityDelivered(30);
-        stubOrder(order);
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        var received = orderService.receiveOrder(1L, 1L, "RESPONSABLE_PHARMACIE", 1L);
-
-        assertThat(received.getStatus()).isEqualTo(OrderStatus.LIVREE.name());
-
-        ArgumentCaptor<StockMovementFormDto> movementCaptor = ArgumentCaptor.forClass(StockMovementFormDto.class);
-        verify(stockService).recordMovement(movementCaptor.capture(), any());
-        assertThat(movementCaptor.getValue().getEntityId()).isEqualTo(1L);
-        assertThat(movementCaptor.getValue().getType()).isEqualTo("ENTREE");
-        assertThat(movementCaptor.getValue().getQuantity()).isEqualTo(30);
-    }
-
-    @Test
-    void reception_fournisseur_credite_le_stock_du_depot() {
-        Order order = order(1L, dc, fournisseur, OrderStatus.VALIDEE_DBI, true, 200);
-        stubOrder(order);
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        var received = orderService.receiveSupplierDelivery(1L, 1L, "RESPONSABLE_DEPOT");
-
-        assertThat(received.getStatus()).isEqualTo(OrderStatus.LIVREE.name());
-        assertThat(received.getItems().get(0).getQuantityDelivered()).isEqualTo(200);
-
-        ArgumentCaptor<StockMovementFormDto> movementCaptor = ArgumentCaptor.forClass(StockMovementFormDto.class);
-        verify(stockService).recordMovement(movementCaptor.capture(), any());
-        assertThat(movementCaptor.getValue().getEntityId()).isEqualTo(2L);
-        assertThat(movementCaptor.getValue().getType()).isEqualTo("ENTREE");
-        assertThat(movementCaptor.getValue().getQuantity()).isEqualTo(200);
+        var rejected = orderService.rejectOrder(1L, "Budget insuffisant", 1L, "DBI");
+        assertThat(rejected.getStatus()).isEqualTo(OrderStatus.REJETEE.name());
+        assertThat(rejected.getRejectionReason()).isEqualTo("Budget insuffisant");
     }
 
     // ------------------------------------------------------------------
-    // Rejet
+    // Transmission fournisseur & réception Dépôt Central
     // ------------------------------------------------------------------
 
     @Test
-    void rejet_dune_demande_directe_par_la_pc() {
-        Order order = order(1L, cm01, pc, OrderStatus.EN_ATTENTE_SERVIE, false, null);
-        stubOrder(order);
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        var rejected = orderService.rejectOrder(1L, 1L, "RESPONSABLE_PHARMACIE");
-
-        assertThat(rejected.getStatus()).isEqualTo(OrderStatus.REJETEE.name());
-    }
-
-    @Test
-    void rejet_dune_commande_dbi_par_la_dbi() {
-        Order order = order(1L, pc, dc, OrderStatus.AJUSTEE_DBI, true, 10);
-        stubOrder(order);
-        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        var rejected = orderService.rejectOrder(1L, 1L, "DBI");
-
-        assertThat(rejected.getStatus()).isEqualTo(OrderStatus.REJETEE.name());
-    }
-
-    @Test
-    void rejet_impossible_sur_une_commande_brouillon() {
-        Order order = order(1L, cm01, pc, OrderStatus.BROUILLON, false, null);
+    void transmission_impossible_sans_validation_dbi() {
+        Order order = order(1L, OrderStatus.EN_ATTENTE_DBI, null, 0);
         stubOrder(order);
 
-        assertThatThrownBy(() -> orderService.rejectOrder(1L, 1L, "ADMIN"))
+        assertThatThrownBy(() -> orderService.sendToSupplier(1L, 1L, "DAAS"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Impossible de rejeter");
+                .hasMessageContaining("Action non permise");
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void transmission_par_la_daas_apres_validation() {
+        Order order = order(1L, OrderStatus.VALIDEE_DBI, 30, 0);
+        stubOrder(order);
+
+        var sent = orderService.sendToSupplier(1L, 1L, "DAAS");
+
+        assertThat(sent.getStatus()).isEqualTo(OrderStatus.ENVOYEE_FOURNISSEUR.name());
+        assertThat(sent.getSentAt()).isNotNull();
+    }
+
+    @Test
+    void reception_partielle_puis_complete_credite_le_stock_du_depot() {
+        Order order = order(1L, OrderStatus.ENVOYEE_FOURNISSEUR, 30, 0);
+        stubOrder(order);
+
+        OrderReceptionFormDto form = new OrderReceptionFormDto();
+        form.getReceptions().add(new OrderReceptionLineDto(100L, 20));
+
+        var partial = orderService.receiveOrder(1L, form, 1L, "RESPONSABLE_DEPOT", 2L);
+        assertThat(partial.getStatus()).isEqualTo(OrderStatus.RECUE_PARTIELLEMENT.name());
+        assertThat(partial.getItems().get(0).getQuantityReceived()).isEqualTo(20);
+
+        OrderReceptionFormDto form2 = new OrderReceptionFormDto();
+        form2.getReceptions().add(new OrderReceptionLineDto(100L, 10));
+        var complete = orderService.receiveOrder(1L, form2, 1L, "RESPONSABLE_DEPOT", 2L);
+        assertThat(complete.getStatus()).isEqualTo(OrderStatus.RECUE.name());
+
+        ArgumentCaptor<StockMovementFormDto> movementCaptor = ArgumentCaptor.forClass(StockMovementFormDto.class);
+        verify(stockService, org.mockito.Mockito.times(2))
+                .recordMovement(movementCaptor.capture(), any(), isNull(), eq(1L));
+        StockMovementFormDto movement = movementCaptor.getValue();
+        assertThat(movement.getEntityId()).isEqualTo(2L);
+        assertThat(movement.getType()).isEqualTo("ENTREE");
+        assertThat(movement.getQuantity()).isEqualTo(10);
+    }
+
+    @Test
+    void reception_superieure_au_reste_est_rejetee() {
+        Order order = order(1L, OrderStatus.ENVOYEE_FOURNISSEUR, 30, 0);
+        stubOrder(order);
+
+        OrderReceptionFormDto form = new OrderReceptionFormDto();
+        form.getReceptions().add(new OrderReceptionLineDto(100L, 40));
+
+        assertThatThrownBy(() -> orderService.receiveOrder(1L, form, 1L, "RESPONSABLE_DEPOT", 2L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("reste à recevoir");
+    }
+
+    @Test
+    void reception_par_une_autre_structure_est_rejetee() {
+        Order order = order(1L, OrderStatus.ENVOYEE_FOURNISSEUR, 30, 0);
+        stubOrder(order);
+
+        assertThatThrownBy(() -> orderService.receiveOrder(1L, null, 1L, "RESPONSABLE_DEPOT", 4L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Dépôt Central");
+    }
+
+    @Test
+    void reception_complete_met_a_jour_la_demande_liee() {
+        Order order = order(1L, OrderStatus.ENVOYEE_FOURNISSEUR, 30, 0);
+        SupplyRequest request = new SupplyRequest();
+        request.setId(9L);
+        request.setRequestNumber("DEM-2026-0001");
+        SupplyRequestItem requestItem = new SupplyRequestItem();
+        requestItem.setProduct(product);
+        requestItem.setQuantityRequested(30);
+        requestItem.setQuantityDelivered(0);
+        request.getRequestItems().add(requestItem);
+        order.setSupplyRequest(request);
+        stubOrder(order);
+
+        OrderReceptionFormDto form = new OrderReceptionFormDto();
+        form.getReceptions().add(new OrderReceptionLineDto(100L, 30));
+        orderService.receiveOrder(1L, form, 1L, "RESPONSABLE_DEPOT", 2L);
+
+        verify(supplyRequestService).registerOrderDelivery(any(Order.class));
+    }
+
+    // ------------------------------------------------------------------
+    // Commande liée à une demande DC -> DAAS
+    // ------------------------------------------------------------------
+
+    @Test
+    void creation_liee_a_une_demande_dc_daas_passe_la_demande_en_cours() {
+        when(structureEntityRepository.findById(7L)).thenReturn(Optional.of(daas));
+        when(structureEntityRepository.findById(6L)).thenReturn(Optional.of(fournisseur));
+        when(structureEntityRepository.findByType("DEPOT_CENTRAL")).thenReturn(List.of(dc));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(author));
+        when(orderRepository.findLastOrderNumberOfYear("2026")).thenReturn(null);
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.existsBySupplyRequestId(9L)).thenReturn(false);
+
+        SupplyRequest request = new SupplyRequest();
+        request.setId(9L);
+        request.setRequestNumber("DEM-2026-0001");
+        request.setStatus("SOUMISE");
+        request.setSupplyingEntity(daas);
+        request.setRequestingEntity(dc);
+        SupplyRequestItem item = new SupplyRequestItem();
+        item.setProduct(product);
+        item.setQuantityRequested(25);
+        item.setQuantityDelivered(0);
+        request.getRequestItems().add(item);
+        when(supplyRequestRepository.findById(9L)).thenReturn(Optional.of(request));
+
+        OrderFormDto form = new OrderFormDto();
+        form.setSupplierEntityId(6L);
+        form.setSupplyRequestId(9L);
+        // Aucune ligne : preremplissage depuis la demande
+
+        var created = orderService.createOrder(form, 1L, "DAAS", 7L);
+
+        assertThat(created.getItems()).hasSize(1);
+        assertThat(created.getItems().get(0).getQuantityRequested()).isEqualTo(25);
+        verify(supplyRequestService).markProcessingByDaas(eq(9L), anyLong());
+    }
+
+    @Test
+    void creation_liee_a_une_demande_deja_traitee_est_rejetee() {
+        when(structureEntityRepository.findById(7L)).thenReturn(Optional.of(daas));
+        when(structureEntityRepository.findById(6L)).thenReturn(Optional.of(fournisseur));
+        when(structureEntityRepository.findByType("DEPOT_CENTRAL")).thenReturn(List.of(dc));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(author));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(orderRepository.findLastOrderNumberOfYear("2026")).thenReturn(null);
+        when(orderRepository.existsBySupplyRequestId(9L)).thenReturn(true);
+
+        SupplyRequest request = new SupplyRequest();
+        request.setId(9L);
+        request.setStatus("EN_COURS_TRAITEMENT");
+        request.setSupplyingEntity(daas);
+        request.setRequestingEntity(dc);
+        when(supplyRequestRepository.findById(9L)).thenReturn(Optional.of(request));
+
+        OrderFormDto form = new OrderFormDto();
+        form.setSupplierEntityId(6L);
+        form.setSupplyRequestId(9L);
+        form.getLines().add(new OrderLineFormDto(1L, 20));
+
+        assertThatThrownBy(() -> orderService.createOrder(form, 1L, "DAAS", 7L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("déjà liée");
     }
 }

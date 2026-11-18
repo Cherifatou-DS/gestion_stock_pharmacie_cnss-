@@ -96,9 +96,6 @@
                     <td class="text-center" th:text="${movement.stockAfter}">125</td>
                     <td th:text="${movement.createdByName}">Admin CNSS</td>
                 </tr>
-                <tr th:if="${#lists.isEmpty(movements)}">
-                    <td colspan="8" class="text-center text-muted py-4">Aucun mouvement enregistré.</td>
-                </tr>
                 </tbody>
             </table>
         </div>
@@ -109,7 +106,8 @@
     $(function () {
         $('#movements-table').DataTable({
             language: {
-                url: '/plugins/datatables/i18n/fr-FR.json'
+                url: '/plugins/datatables/i18n/fr-FR.json',
+                emptyTable: 'Aucun mouvement enregistré.'
             },
             responsive: true,
             pageLength: 10,

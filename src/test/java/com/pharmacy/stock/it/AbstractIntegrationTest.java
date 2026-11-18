@@ -41,9 +41,12 @@ public abstract class AbstractIntegrationTest {
      */
     @BeforeEach
     void cleanBusinessData() {
+        jdbcTemplate.update("DELETE FROM financial_transactions");
+        jdbcTemplate.update("DELETE FROM stock_movements");
         jdbcTemplate.update("DELETE FROM order_items");
         jdbcTemplate.update("DELETE FROM orders");
-        jdbcTemplate.update("DELETE FROM stock_movements");
+        jdbcTemplate.update("DELETE FROM supply_request_items");
+        jdbcTemplate.update("DELETE FROM supply_requests");
         jdbcTemplate.update("DELETE FROM stocks");
         jdbcTemplate.update("DELETE FROM action_logs");
         insertDemoStocks();

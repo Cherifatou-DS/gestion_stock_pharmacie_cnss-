@@ -11,7 +11,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Formulaire de création d'une demande / commande de produits pharmaceutiques.
+ * Formulaire de création d'une commande fournisseur par la DAAS.
+ * La demande d'approvisionnement du Dépôt Central à l'origine de la
+ * commande est optionnelle (une commande peut être émise de façon autonome).
  */
 @Getter
 @Setter
@@ -19,8 +21,11 @@ import java.util.List;
 @AllArgsConstructor
 public class OrderFormDto extends BaseDto {
 
-    @NotNull(message = "La structure destinataire est obligatoire")
-    private Long targetEntityId;
+    @NotNull(message = "Le fournisseur est obligatoire")
+    private Long supplierEntityId;
+
+    /** Demande d'approvisionnement DC → DAAS liée (optionnelle). */
+    private Long supplyRequestId;
 
     private List<OrderLineFormDto> lines = new ArrayList<>();
 }

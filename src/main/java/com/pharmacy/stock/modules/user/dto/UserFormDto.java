@@ -34,6 +34,7 @@ public class UserFormDto extends BaseDto {
     private String email;
 
     @Size(min = 8, max = 100, message = "Le mot de passe doit contenir entre 8 et 100 caractères")
+    @com.pharmacy.stock.common.validation.StrongPassword
     private String password;
 
     @jakarta.validation.constraints.NotNull(message = "Le rôle est obligatoire")

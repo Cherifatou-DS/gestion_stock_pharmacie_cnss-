@@ -61,10 +61,12 @@ src/main/java/com/pharmacy/stock/
 ├── common/                    # BaseDto, BusinessException, DateUtils
 └── modules/
     ├── user/                  # Authentification, comptes, rôles (controller/dto/entity/repository/service/security)
-    ├── entity/                # Structures (CM, PC, DC, DBI, Fournisseur)
+    ├── entity/                # Structures (CM, PC, DC, DBI, DAAS, Fournisseur)
     ├── product/               # Catalogue produits
     ├── stock/                 # Stocks, mouvements, seuils, alertes
-    ├── order/                 # Circuit des commandes + validation DBI
+    ├── supply/                # Demandes d'approvisionnement (CM → PC, PC → DC, DC → DAAS)
+    ├── order/                 # Commandes fournisseurs DAAS : création, validation DBI, envoi, réception DC
+    ├── finance/               # Suivi financier DBI : engagements fournisseurs, sorties valorisées
     └── audit/                 # Journal d'action_logs
 ```
 
@@ -106,7 +108,9 @@ un fichier exécuté est **immuable** — toute évolution = nouveau fichier `V(
 ## 5. Modèle de données & migration
 
 Tables : `roles`, `entities`, `users`, `products`, `stocks` (unicité `entity_id+product_id`),
-`orders` (+ `order_items`), `stock_movements` (journal entrées/sorties/ajustements), `action_logs` (audit).
+`supply_requests` (+ `supply_request_items`), `orders` (+ `order_items` : commandes fournisseurs DAAS),
+`stock_movements` (journal entrées/sorties/ajustements, références `reference_supply_request_id` /
+`reference_order_id` exclusives), `financial_transactions` (suivi financier DBI), `action_logs` (audit).
 
 Migrations actuelles :
 
@@ -117,6 +121,9 @@ Migrations actuelles :
 | V3 | Alignement des colonnes id/FK en `BIGINT` |
 | V4 | Compte `admin` initial (`Admin@123`) |
 | V5 | **Comptes de démonstration** (mot de passe `Demo@1234`), produits et stocks de démo |
+| V6 | Colonne `entities.is_active` |
+| V7 | Colonne `users.must_change_password` + sécurisation des mots de passe connus |
+| V8 | **Refonte v1.2** : type d'entité et rôle `DAAS`, tables `supply_requests`/`supply_request_items`, refonte `orders`/`order_items` (commandes fournisseurs), `reference_supply_request_id` sur `stock_movements`, table `financial_transactions`, compte de démo `agent_daas`, migration des données legacy |
 
 > V5 est destiné aux environnements de développement/démonstration : ne pas l'exécuter en production
 > (retirer le fichier du classpath prod ou insérer un jeu de données dédié).

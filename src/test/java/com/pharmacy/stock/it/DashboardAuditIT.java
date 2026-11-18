@@ -19,8 +19,8 @@ class DashboardAuditIT extends AbstractIntegrationTest {
         mockMvc.perform(get("/dashboard").session(session))
                 .andExpect(status().isOk())
                 .andExpect(view().name("pages/dashboard/index"))
-                .andExpect(model().attributeExists("pendingOrders", "readyToShipOrders",
-                        "lowStocks", "productCount", "recentOrders", "recentLogs"));
+                .andExpect(model().attributeExists("pendingOrders", "readyToSendOrders",
+                        "pendingSupplyRequests", "lowStocks", "productCount", "recentOrders", "recentLogs"));
     }
 
     @Test

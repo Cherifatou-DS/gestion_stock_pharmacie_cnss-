@@ -1,6 +1,7 @@
 package com.pharmacy.stock.modules.order.controller;
 
 import com.pharmacy.stock.common.exception.BusinessException;
+import com.pharmacy.stock.common.util.ClientIpResolver;
 import com.pharmacy.stock.modules.audit.service.AuditService;
 import com.pharmacy.stock.modules.entity.entity.StructureEntity;
 import com.pharmacy.stock.modules.entity.service.StructureEntityService;
@@ -8,9 +9,13 @@ import com.pharmacy.stock.modules.order.dto.OrderAdjustmentFormDto;
 import com.pharmacy.stock.modules.order.dto.OrderDto;
 import com.pharmacy.stock.modules.order.dto.OrderFormDto;
 import com.pharmacy.stock.modules.order.dto.OrderLineFormDto;
+import com.pharmacy.stock.modules.order.dto.OrderReceptionFormDto;
+import com.pharmacy.stock.modules.order.dto.OrderRejectionFormDto;
 import com.pharmacy.stock.modules.order.entity.OrderStatus;
 import com.pharmacy.stock.modules.order.service.OrderService;
 import com.pharmacy.stock.modules.product.service.ProductService;
+import com.pharmacy.stock.modules.supply.dto.SupplyRequestDto;
+import com.pharmacy.stock.modules.supply.service.SupplyRequestService;
 import com.pharmacy.stock.modules.user.security.CustomUserDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -31,7 +36,8 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Circuit des commandes & validations DBI — routes : /orders
+ * Circuit des commandes fournisseurs de la DAAS — routes : /orders
+ * (création DAAS, validation DBI, réception Dépôt Central).
  */
 @Controller
 @RequestMapping("/orders")
@@ -41,31 +47,46 @@ public class OrderController {
     private final OrderService orderService;
     private final StructureEntityService structureEntityService;
     private final ProductService productService;
+    private final SupplyRequestService supplyRequestService;
     private final AuditService auditService;
+    private final ClientIpResolver clientIpResolver;
 
     @GetMapping
-    public String list(@RequestParam(required = false) Long sourceEntityId,
+    public String list(@RequestParam(required = false) Long supplierEntityId,
                        @RequestParam(required = false) String status,
                        @AuthenticationPrincipal CustomUserDetails currentUser,
                        Model model) {
-        boolean restricted = !isAdminOrManager(currentUser.getRole());
         model.addAttribute("orders", orderService.findOrders(
-                currentUser.getEntityId(), currentUser.getRole(), sourceEntityId, status));
-        model.addAttribute("entities", restricted ? List.of() : structureEntityService.findAll());
+                currentUser.getEntityId(), currentUser.getRole(), supplierEntityId, status));
+        model.addAttribute("suppliers", structureEntityService.findByType("FOURNISSEUR"));
         model.addAttribute("statuses", Arrays.asList(OrderStatus.values()));
-        model.addAttribute("selectedSourceEntityId", sourceEntityId);
+        model.addAttribute("selectedSupplierEntityId", supplierEntityId);
         model.addAttribute("selectedStatus", status);
-        model.addAttribute("restricted", restricted);
         return "pages/orders/list";
     }
 
     @GetMapping("/new")
-    public String newForm(@AuthenticationPrincipal CustomUserDetails currentUser, Model model) {
+    public String newForm(@RequestParam(required = false) Long supplyRequestId,
+                          @AuthenticationPrincipal CustomUserDetails currentUser,
+                          Model model) {
         OrderFormDto form = new OrderFormDto();
         form.getLines().add(new OrderLineFormDto());
+        if (supplyRequestId != null) {
+            supplyRequestService.findRequestDetail(supplyRequestId, currentUser.getEntityId(),
+                    currentUser.getRole())
+                    .ifPresent(request -> {
+                        form.setSupplyRequestId(request.getId());
+                        form.getLines().clear();
+                        request.getItems().forEach(item ->
+                                form.getLines().add(new OrderLineFormDto(item.getProductId(),
+                                        item.getQuantityRequested())));
+                        model.addAttribute("linkedRequest", request);
+                    });
+        }
         model.addAttribute("orderForm", form);
-        model.addAttribute("allowedTargets", allowedTargets(currentUser.getRole()));
+        model.addAttribute("suppliers", structureEntityService.findByType("FOURNISSEUR"));
         model.addAttribute("products", productService.findAll());
+        model.addAttribute("openSupplyRequests", openSupplyRequests(currentUser));
         return "pages/orders/form";
     }
 
@@ -77,25 +98,30 @@ public class OrderController {
                          Model model,
                          RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
-            model.addAttribute("allowedTargets", allowedTargets(currentUser.getRole()));
+            model.addAttribute("suppliers", structureEntityService.findByType("FOURNISSEUR"));
             model.addAttribute("products", productService.findAll());
+            model.addAttribute("openSupplyRequests", openSupplyRequests(currentUser));
             return "pages/orders/form";
         }
         try {
             OrderDto created = orderService.createOrder(form, currentUser.getId(),
                     currentUser.getRole(), currentUser.getEntityId());
             auditService.record(currentUser.getId(), "CREATION_COMMANDE", "ORDERS", created.getId(),
-                    "Création de la commande " + created.getOrderNumber()
-                            + " (" + created.getSourceEntityCode() + " -> " + created.getTargetEntityCode()
-                            + ", " + created.getItems().size() + " ligne(s))",
-                    request.getRemoteAddr());
+                    "Création de la commande fournisseur " + created.getOrderNumber()
+                            + " (" + created.getSupplierEntityName() + ", " + created.getItems().size()
+                            + " ligne(s)"
+                            + (created.getSupplyRequestNumber() != null
+                                    ? ", demande " + created.getSupplyRequestNumber() : "")
+                            + ")",
+                    clientIpResolver.resolve(request));
             redirectAttributes.addFlashAttribute("message",
                     "Commande " + created.getOrderNumber() + " créée à l'état Brouillon.");
-            return "redirect:/orders";
+            return "redirect:/orders/" + created.getId();
         } catch (BusinessException e) {
             model.addAttribute("error", e.getMessage());
-            model.addAttribute("allowedTargets", allowedTargets(currentUser.getRole()));
+            model.addAttribute("suppliers", structureEntityService.findByType("FOURNISSEUR"));
             model.addAttribute("products", productService.findAll());
+            model.addAttribute("openSupplyRequests", openSupplyRequests(currentUser));
             return "pages/orders/form";
         }
     }
@@ -108,6 +134,8 @@ public class OrderController {
                 .orElseThrow(() -> new BusinessException("Commande introuvable : id=" + id));
         model.addAttribute("order", order);
         model.addAttribute("adjustmentForm", new OrderAdjustmentFormDto());
+        model.addAttribute("rejectionForm", new OrderRejectionFormDto());
+        model.addAttribute("receptionForm", new OrderReceptionFormDto());
         addOrderActions(order, currentUser, model);
         return "pages/orders/detail";
     }
@@ -118,31 +146,9 @@ public class OrderController {
                          HttpServletRequest request,
                          RedirectAttributes redirectAttributes) {
         return executeOrderAction(id, currentUser, request, redirectAttributes, "SOUMISSION",
-                "Soumission de la commande %s -> EN_ATTENTE",
+                "Soumission de la commande %s -> EN_ATTENTE_DBI",
                 () -> orderService.submitOrder(id, currentUser.getId(), currentUser.getRole()),
-                order -> "Commande " + order.getOrderNumber() + " soumise : " + order.getStatusLabel() + ".");
-    }
-
-    @PostMapping("/{id}/deliver")
-    public String deliver(@PathVariable Long id,
-                          @AuthenticationPrincipal CustomUserDetails currentUser,
-                          HttpServletRequest request,
-                          RedirectAttributes redirectAttributes) {
-        return executeOrderAction(id, currentUser, request, redirectAttributes, "LIVRAISON",
-                "Livraison directe de la commande %s par la Pharmacie Centrale (stock débité)",
-                () -> orderService.deliverOrder(id, currentUser.getId(), currentUser.getRole()),
-                order -> "Commande " + order.getOrderNumber() + " délivrée : stock de la PC débité.");
-    }
-
-    @PostMapping("/{id}/reject")
-    public String reject(@PathVariable Long id,
-                         @AuthenticationPrincipal CustomUserDetails currentUser,
-                         HttpServletRequest request,
-                         RedirectAttributes redirectAttributes) {
-        return executeOrderAction(id, currentUser, request, redirectAttributes, "REJET",
-                "Rejet de la commande %s",
-                () -> orderService.rejectOrder(id, currentUser.getId(), currentUser.getRole()),
-                order -> "Commande " + order.getOrderNumber() + " rejetée.");
+                order -> "Commande " + order.getOrderNumber() + " soumise à la validation DBI.");
     }
 
     @PostMapping("/{id}/adjust")
@@ -160,7 +166,7 @@ public class OrderController {
             OrderDto order = orderService.adjustOrder(id, form, currentUser.getId(), currentUser.getRole());
             auditService.record(currentUser.getId(), "REAJUSTEMENT", "ORDERS", id,
                     "Réajustement des quantités de la commande " + order.getOrderNumber() + " par la DBI",
-                    request.getRemoteAddr());
+                    clientIpResolver.resolve(request));
             redirectAttributes.addFlashAttribute("message",
                     "Commande " + order.getOrderNumber() + " réajustée par la DBI.");
             return "redirect:/orders/{id}";
@@ -176,43 +182,73 @@ public class OrderController {
                                 HttpServletRequest request,
                                 RedirectAttributes redirectAttributes) {
         return executeOrderAction(id, currentUser, request, redirectAttributes, "VALIDATION_DBI",
-                "Validation DBI de la commande %s",
+                "Validation DBI de la commande %s (engagement fournisseur enregistré)",
                 () -> orderService.validateByDbi(id, currentUser.getId(), currentUser.getRole()),
-                order -> "Commande " + order.getOrderNumber() + " validée par la DBI.");
+                order -> "Commande " + order.getOrderNumber() + " validée par la DBI : engagement fournisseur de "
+                        + order.getTotalAmount() + " enregistré.");
     }
 
-    @PostMapping("/{id}/ship")
-    public String ship(@PathVariable Long id,
+    @PostMapping("/{id}/reject")
+    public String reject(@PathVariable Long id,
+                         @Valid @ModelAttribute("rejectionForm") OrderRejectionFormDto form,
+                         BindingResult result,
+                         @AuthenticationPrincipal CustomUserDetails currentUser,
+                         HttpServletRequest request,
+                         Model model,
+                         RedirectAttributes redirectAttributes) {
+        if (result.hasErrors()) {
+            return backToDetailWithOrder(id, currentUser, model);
+        }
+        try {
+            OrderDto order = orderService.rejectOrder(id, form.getRejectionReason(),
+                    currentUser.getId(), currentUser.getRole());
+            auditService.record(currentUser.getId(), "REJET", "ORDERS", id,
+                    "Rejet de la commande " + order.getOrderNumber() + " par la DBI",
+                    clientIpResolver.resolve(request));
+            redirectAttributes.addFlashAttribute("message",
+                    "Commande " + order.getOrderNumber() + " rejetée.");
+            return "redirect:/orders/{id}";
+        } catch (BusinessException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return "redirect:/orders/{id}";
+        }
+    }
+
+    @PostMapping("/{id}/send")
+    public String send(@PathVariable Long id,
                        @AuthenticationPrincipal CustomUserDetails currentUser,
                        HttpServletRequest request,
                        RedirectAttributes redirectAttributes) {
-        return executeOrderAction(id, currentUser, request, redirectAttributes, "EXPEDITION",
-                "Expédition de la commande %s par le Dépôt Central (stock débité)",
-                () -> orderService.shipOrder(id, currentUser.getId(), currentUser.getRole()),
-                order -> "Commande " + order.getOrderNumber() + " expédiée : stock du Dépôt Central débité.");
+        return executeOrderAction(id, currentUser, request, redirectAttributes, "ENVOI_FOURNISSEUR",
+                "Transmission de la commande %s au fournisseur",
+                () -> orderService.sendToSupplier(id, currentUser.getId(), currentUser.getRole()),
+                order -> "Commande " + order.getOrderNumber() + " transmise au fournisseur.");
     }
 
     @PostMapping("/{id}/receive")
     public String receive(@PathVariable Long id,
+                          @Valid @ModelAttribute("receptionForm") OrderReceptionFormDto form,
+                          BindingResult result,
                           @AuthenticationPrincipal CustomUserDetails currentUser,
                           HttpServletRequest request,
+                          Model model,
                           RedirectAttributes redirectAttributes) {
-        return executeOrderAction(id, currentUser, request, redirectAttributes, "RECEPTION",
-                "Réception de la commande %s (stock crédité)",
-                () -> orderService.receiveOrder(id, currentUser.getId(),
-                        currentUser.getRole(), currentUser.getEntityId()),
-                order -> "Commande " + order.getOrderNumber() + " réceptionnée : stock crédité.");
-    }
-
-    @PostMapping("/{id}/receive-supplier")
-    public String receiveSupplier(@PathVariable Long id,
-                                  @AuthenticationPrincipal CustomUserDetails currentUser,
-                                  HttpServletRequest request,
-                                  RedirectAttributes redirectAttributes) {
-        return executeOrderAction(id, currentUser, request, redirectAttributes, "RECEPTION",
-                "Réception fournisseur de la commande %s (stock DC crédité)",
-                () -> orderService.receiveSupplierDelivery(id, currentUser.getId(), currentUser.getRole()),
-                order -> "Livraison fournisseur de " + order.getOrderNumber() + " réceptionnée : stock du DC crédité.");
+        if (result.hasErrors()) {
+            return backToDetailWithOrder(id, currentUser, model);
+        }
+        try {
+            OrderDto order = orderService.receiveOrder(id, form, currentUser.getId(),
+                    currentUser.getRole(), currentUser.getEntityId());
+            auditService.record(currentUser.getId(), "RECEPTION", "ORDERS", id,
+                    "Réception de la commande " + order.getOrderNumber() + " au Dépôt Central (stock crédité)",
+                    clientIpResolver.resolve(request));
+            redirectAttributes.addFlashAttribute("message",
+                    "Réception enregistrée : " + order.getOrderNumber() + " — " + order.getStatusLabel() + ".");
+            return "redirect:/orders/{id}";
+        } catch (BusinessException e) {
+            redirectAttributes.addFlashAttribute("error", e.getMessage());
+            return "redirect:/orders/{id}";
+        }
     }
 
     // ------------------------------------------------------------------
@@ -239,7 +275,7 @@ public class OrderController {
         try {
             OrderDto order = action.run();
             auditService.record(currentUser.getId(), actionType, "ORDERS", id,
-                    String.format(auditTemplate, order.getOrderNumber()), request.getRemoteAddr());
+                    String.format(auditTemplate, order.getOrderNumber()), clientIpResolver.resolve(request));
             redirectAttributes.addFlashAttribute("message", successMessage.apply(order));
             return "redirect:/orders/{id}";
         } catch (BusinessException e) {
@@ -249,32 +285,25 @@ public class OrderController {
     }
 
     private String backToDetailWithOrder(Long id, CustomUserDetails currentUser, Model model) {
-        model.addAttribute("order", orderService.findOrderDetail(id,
+        OrderDto order = orderService.findOrderDetail(id,
                 currentUser.getEntityId(), currentUser.getRole())
-                .orElseThrow(() -> new BusinessException("Commande introuvable : id=" + id)));
+                .orElseThrow(() -> new BusinessException("Commande introuvable : id=" + id));
+        model.addAttribute("order", order);
+        model.addAttribute("adjustmentForm", new OrderAdjustmentFormDto());
+        model.addAttribute("rejectionForm", new OrderRejectionFormDto());
+        model.addAttribute("receptionForm", new OrderReceptionFormDto());
+        addOrderActions(order, currentUser, model);
         return "pages/orders/detail";
     }
 
     /**
-     * Structures destinataires proposées selon le rôle de l'utilisateur.
+     * Demandes d'approvisionnement DC → DAAS ouvertes (traitables par une commande).
      */
-    private List<StructureEntity> allowedTargets(String role) {
-        List<StructureEntity> all = structureEntityService.findAll();
-        return switch (role == null ? "" : role) {
-            case "CHEF_SERVICE", "AGENT_APPROVISIONNEMENT" ->
-                    all.stream().filter(e -> "PHARMACIE_CENTRALE".equals(e.getType())).toList();
-            case "RESPONSABLE_PHARMACIE" ->
-                    all.stream().filter(e -> "DEPOT_CENTRAL".equals(e.getType())).toList();
-            case "RESPONSABLE_DEPOT" ->
-                    all.stream().filter(e -> "FOURNISSEUR".equals(e.getType())).toList();
-            default ->
-                    all.stream().filter(e -> List.of("PHARMACIE_CENTRALE", "DEPOT_CENTRAL", "FOURNISSEUR")
-                            .contains(e.getType())).toList();
-        };
-    }
-
-    private boolean isAdminOrManager(String role) {
-        return List.of("ADMIN", "RESPONSABLE_PHARMACIE", "RESPONSABLE_DEPOT", "DBI").contains(role);
+    private List<SupplyRequestDto> openSupplyRequests(CustomUserDetails currentUser) {
+        if (!List.of("DAAS", "ADMIN").contains(currentUser.getRole())) {
+            return List.of();
+        }
+        return supplyRequestService.findOpenRequestsForDaas();
     }
 
     /**
@@ -284,22 +313,20 @@ public class OrderController {
         String role = currentUser.getRole();
         String status = order.getStatus();
         boolean isDbi = "DBI".equals(role) || "ADMIN".equals(role);
-        boolean isPc = "RESPONSABLE_PHARMACIE".equals(role) || "ADMIN".equals(role);
-        boolean isDc = "RESPONSABLE_DEPOT".equals(role) || "ADMIN".equals(role);
+        boolean isDaas = "DAAS".equals(role) || "ADMIN".equals(role);
+        boolean isDc = "RESPONSABLE_DEPOT".equals(role) || "MAGASINIER".equals(role) || "ADMIN".equals(role);
 
-        model.addAttribute("canSubmit", "BROUILLON".equals(status));
-        model.addAttribute("canDeliver", "EN_ATTENTE_SERVIE".equals(status) && isPc);
-        model.addAttribute("canReject",
-                ("EN_ATTENTE_SERVIE".equals(status) && isPc)
-                        || (("EN_ATTENTE_DBI".equals(status) || "AJUSTEE_DBI".equals(status)) && isDbi));
-        model.addAttribute("canAdjust", ("EN_ATTENTE_DBI".equals(status) || "AJUSTEE_DBI".equals(status)) && isDbi);
+        model.addAttribute("canSubmit", "BROUILLON".equals(status) && isDaas);
+        model.addAttribute("canAdjust",
+                ("EN_ATTENTE_DBI".equals(status) || "AJUSTEE_DBI".equals(status)) && isDbi);
         model.addAttribute("canValidateDbi",
                 ("EN_ATTENTE_DBI".equals(status) || "AJUSTEE_DBI".equals(status)) && isDbi);
-        model.addAttribute("canShip", "VALIDEE_DBI".equals(status) && isDc
-                && "DEPOT_CENTRAL".equals(order.getTargetEntityType()));
-        model.addAttribute("canReceiveSupplier",
-                "VALIDEE_DBI".equals(status) && isDc && "FOURNISSEUR".equals(order.getTargetEntityType()));
-        model.addAttribute("canReceive", "EXPEDIEE".equals(status)
-                && ("ADMIN".equals(role) || order.getSourceEntityId().equals(currentUser.getEntityId())));
+        model.addAttribute("canReject",
+                ("EN_ATTENTE_DBI".equals(status) || "AJUSTEE_DBI".equals(status)) && isDbi);
+        model.addAttribute("canSend", "VALIDEE_DBI".equals(status) && isDaas);
+        model.addAttribute("canReceive",
+                ("ENVOYEE_FOURNISSEUR".equals(status) || "RECUE_PARTIELLEMENT".equals(status)) && isDc
+                        && ("ADMIN".equals(role)
+                            || order.getReceivingEntityId().equals(currentUser.getEntityId())));
     }
 }

@@ -3,34 +3,39 @@ package com.pharmacy.stock.it;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpSession;
 
+import java.math.BigDecimal;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Tests d'integration du circuit complet des commandes
- * (processus A : livraison directe PC ; processus B : circuit DBI).
+ * Tests d'integration du circuit complet des commandes fournisseurs (v1.2) :
+ * DAAS (creation) -> DBI (ajustement / validation) -> DAAS (transmission fournisseur)
+ * -> Depot Central (reception partielle puis complete).
  */
 class OrderWorkflowIT extends AbstractIntegrationTest {
 
-    private static final Long PC_ID = 1L;
     private static final Long DC_ID = 2L;
+    private static final Long FRN01_ID = 6L;
     private static final Long MED001_ID = 1L;
 
     @Test
-    void circuit_complet_pc_dci_avec_reajustement_et_validation_dbi() throws Exception {
-        // Stock de demonstration DC / MED001 = 500 (V5)
-        MockHttpSession pharmacie = login("resp_pharmacie", DEMO_PASSWORD);
+    void circuit_complet_daas_dbi_fournisseur_reception_dc() throws Exception {
+        MockHttpSession daas = login("agent_daas", DEMO_PASSWORD);
 
-        Long orderId = createOrder(pharmacie, DC_ID, 40);
-        mockMvc.perform(post("/orders/{id}/submit", orderId).session(pharmacie).with(csrf()))
+        // Creation DAAS : 40 unites de MED001 (prix unitaire 500) -> BROUILLON
+        Long orderId = createOrder(daas, FRN01_ID, 40);
+        assertThat(statusOf(orderId)).isEqualTo("BROUILLON");
+
+        // Soumission DAAS -> EN_ATTENTE_DBI
+        mockMvc.perform(post("/orders/{id}/submit", orderId).session(daas).with(csrf()))
                 .andExpect(status().is3xxRedirection());
         assertThat(statusOf(orderId)).isEqualTo("EN_ATTENTE_DBI");
 
-        // DBI : reajustement 40 -> 30 puis validation
+        // DBI : reajustement 40 -> 30 puis validation (engagement 30 x 500 = 15000)
         MockHttpSession dbi = login("dbi_valideur", DEMO_PASSWORD);
         Long itemId = jdbcTemplate.queryForObject(
                 "SELECT id FROM order_items WHERE order_id = ?", Long.class, orderId);
@@ -43,103 +48,114 @@ class OrderWorkflowIT extends AbstractIntegrationTest {
         mockMvc.perform(post("/orders/{id}/validate-dbi", orderId).session(dbi).with(csrf()))
                 .andExpect(status().is3xxRedirection());
         assertThat(statusOf(orderId)).isEqualTo("VALIDEE_DBI");
+        BigDecimal engagement = jdbcTemplate.queryForObject(
+                "SELECT amount FROM financial_transactions WHERE reference_order_id = ?",
+                BigDecimal.class, orderId);
+        assertThat(engagement).isEqualByComparingTo("15000.00");
 
-        // Depot Central : expedition (stock DC 500 -> 470)
+        // DAAS : transmission au fournisseur -> ENVOYEE_FOURNISSEUR
+        mockMvc.perform(post("/orders/{id}/send", orderId).session(daas).with(csrf()))
+                .andExpect(status().is3xxRedirection());
+        assertThat(statusOf(orderId)).isEqualTo("ENVOYEE_FOURNISSEUR");
+
+        // Depot Central : reception partielle de 20 unites (stock DC 500 -> 520)
         MockHttpSession depot = login("resp_depot", DEMO_PASSWORD);
-        mockMvc.perform(post("/orders/{id}/ship", orderId).session(depot).with(csrf()))
+        mockMvc.perform(post("/orders/{id}/receive", orderId).session(depot).with(csrf())
+                        .param("receptions[0].itemId", itemId.toString())
+                        .param("receptions[0].receivedQuantity", "20"))
                 .andExpect(status().is3xxRedirection());
-        assertThat(statusOf(orderId)).isEqualTo("EXPEDIEE");
-        assertThat(stockOf(DC_ID, MED001_ID)).isEqualTo(470);
+        assertThat(statusOf(orderId)).isEqualTo("RECUE_PARTIELLEMENT");
+        assertThat(stockOf(DC_ID, MED001_ID)).isEqualTo(520);
 
-        // Pharmacie Centrale : reception (stock PC 250 -> 280)
-        mockMvc.perform(post("/orders/{id}/receive", orderId).session(pharmacie).with(csrf()))
+        // Reception complete des 10 unites restantes (stock DC 520 -> 530)
+        mockMvc.perform(post("/orders/{id}/receive", orderId).session(depot).with(csrf())
+                        .param("receptions[0].itemId", itemId.toString())
+                        .param("receptions[0].receivedQuantity", "10"))
                 .andExpect(status().is3xxRedirection());
-        assertThat(statusOf(orderId)).isEqualTo("LIVREE");
-        assertThat(stockOf(PC_ID, MED001_ID)).isEqualTo(280);
+        assertThat(statusOf(orderId)).isEqualTo("RECUE");
+        assertThat(stockOf(DC_ID, MED001_ID)).isEqualTo(530);
 
-        Integer delivered = jdbcTemplate.queryForObject(
-                "SELECT quantity_delivered FROM order_items WHERE order_id = ?", Integer.class, orderId);
-        assertThat(delivered).isEqualTo(30);
+        Integer received = jdbcTemplate.queryForObject(
+                "SELECT quantity_received FROM order_items WHERE order_id = ?", Integer.class, orderId);
+        assertThat(received).isEqualTo(30);
+
+        // Mouvement ENTREE lie a la commande (reference_order_id renseigne)
+        String reference = jdbcTemplate.queryForObject(
+                "SELECT o.order_number FROM stock_movements m JOIN orders o ON o.id = m.reference_order_id "
+                        + "WHERE m.type = 'ENTREE' LIMIT 1", String.class);
+        assertThat(reference).isEqualTo(orderNumberOf(orderId));
     }
 
     @Test
-    void un_chef_de_service_ne_peut_pas_valider_une_commande_dbi() throws Exception {
-        MockHttpSession pharmacie = login("resp_pharmacie", DEMO_PASSWORD);
-        Long orderId = createOrder(pharmacie, DC_ID, 40);
-        mockMvc.perform(post("/orders/{id}/submit", orderId).session(pharmacie).with(csrf()))
+    void une_commande_ne_peut_pas_etre_envoyee_sans_validation_dbi() throws Exception {
+        MockHttpSession daas = login("agent_daas", DEMO_PASSWORD);
+        Long orderId = createOrder(daas, FRN01_ID, 40);
+        mockMvc.perform(post("/orders/{id}/submit", orderId).session(daas).with(csrf()))
                 .andExpect(status().is3xxRedirection());
+        assertThat(statusOf(orderId)).isEqualTo("EN_ATTENTE_DBI");
 
-        MockHttpSession chef = login("chef_cm01", DEMO_PASSWORD);
-        mockMvc.perform(post("/orders/{id}/validate-dbi", orderId).session(chef).with(csrf()))
+        // La DAAS ne peut pas transmettre une commande non validee par la DBI.
+        mockMvc.perform(post("/orders/{id}/send", orderId).session(daas).with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(flash().attributeExists("error"));
         assertThat(statusOf(orderId)).isEqualTo("EN_ATTENTE_DBI");
     }
 
     @Test
-    void expedition_impossible_si_stock_depot_insuffisant() throws Exception {
-        // Reduction arbitraire du stock de demonstration DC / MED001 a 5 unites
-        jdbcTemplate.update("UPDATE stocks SET quantity = 5 WHERE entity_id = 2 AND product_id = 1");
-
-        MockHttpSession pharmacie = login("resp_pharmacie", DEMO_PASSWORD);
-        Long orderId = createOrder(pharmacie, DC_ID, 40);
-        mockMvc.perform(post("/orders/{id}/submit", orderId).session(pharmacie).with(csrf()))
+    void rejet_dbi_avec_motif_obligatoire() throws Exception {
+        MockHttpSession daas = login("agent_daas", DEMO_PASSWORD);
+        Long orderId = createOrder(daas, FRN01_ID, 40);
+        mockMvc.perform(post("/orders/{id}/submit", orderId).session(daas).with(csrf()))
                 .andExpect(status().is3xxRedirection());
 
         MockHttpSession dbi = login("dbi_valideur", DEMO_PASSWORD);
-        mockMvc.perform(post("/orders/{id}/validate-dbi", orderId).session(dbi).with(csrf()))
-                .andExpect(status().is3xxRedirection());
+        // Sans motif : le formulaire est re-rendu avec l'erreur de validation
+        mockMvc.perform(post("/orders/{id}/reject", orderId).session(dbi).with(csrf()))
+                .andExpect(status().isOk());
+        assertThat(statusOf(orderId)).isEqualTo("EN_ATTENTE_DBI");
 
-        MockHttpSession depot = login("resp_depot", DEMO_PASSWORD);
-        mockMvc.perform(post("/orders/{id}/ship", orderId).session(depot).with(csrf()))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(flash().attributeExists("error"));
-        assertThat(statusOf(orderId)).isEqualTo("VALIDEE_DBI");
+        // Avec motif : rejet enregistre
+        mockMvc.perform(post("/orders/{id}/reject", orderId).session(dbi).with(csrf())
+                        .param("rejectionReason", "Budget insuffisant"))
+                .andExpect(status().is3xxRedirection());
+        assertThat(statusOf(orderId)).isEqualTo("REJETEE");
+        String reason = jdbcTemplate.queryForObject(
+                "SELECT rejection_reason FROM orders WHERE id = ?", String.class, orderId);
+        assertThat(reason).isEqualTo("Budget insuffisant");
     }
 
     @Test
-    void demande_cm_livree_directement_par_la_pc_sans_dbi() throws Exception {
-        // Processus A : stock de demonstration PC / MED001 = 250 (V5)
-        MockHttpSession chef = login("chef_cm01", DEMO_PASSWORD);
-        Long orderId = createOrder(chef, PC_ID, 20);
-
-        mockMvc.perform(post("/orders/{id}/submit", orderId).session(chef).with(csrf()))
-                .andExpect(status().is3xxRedirection());
-        assertThat(statusOf(orderId)).isEqualTo("EN_ATTENTE_SERVIE");
-        assertThat(requiresDbi(orderId)).isFalse();
-
+    void seul_un_utilisateur_daas_peut_creer_une_commande() throws Exception {
+        // Le responsable PC n'a pas accès au module /orders (403 côté sécurité).
         MockHttpSession pharmacie = login("resp_pharmacie", DEMO_PASSWORD);
-        mockMvc.perform(post("/orders/{id}/deliver", orderId).session(pharmacie).with(csrf()))
-                .andExpect(status().is3xxRedirection());
-
-        assertThat(statusOf(orderId)).isEqualTo("LIVREE");
-        // Stock PC : 250 -> 230
-        assertThat(stockOf(PC_ID, MED001_ID)).isEqualTo(230);
+        mockMvc.perform(post("/orders").session(pharmacie).with(csrf())
+                        .param("supplierEntityId", FRN01_ID.toString())
+                        .param("lines[0].productId", MED001_ID.toString())
+                        .param("lines[0].quantityRequested", "20"))
+                .andExpect(status().isForbidden());
     }
 
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 
-    private Long createOrder(MockHttpSession session, Long targetId, int quantity) throws Exception {
+    private Long createOrder(MockHttpSession session, Long supplierId, int quantity) throws Exception {
         mockMvc.perform(post("/orders").session(session).with(csrf())
-                        .param("targetEntityId", targetId.toString())
+                        .param("supplierEntityId", supplierId.toString())
                         .param("lines[0].productId", MED001_ID.toString())
                         .param("lines[0].quantityRequested", String.valueOf(quantity)))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/orders"));
+                .andExpect(status().is3xxRedirection());
         Long orderId = jdbcTemplate.queryForObject("SELECT max(id) FROM orders", Long.class);
         assertThat(orderId).isNotNull();
         return orderId;
     }
 
-    private String statusOf(Long orderId) {
-        return jdbcTemplate.queryForObject("SELECT status FROM orders WHERE id = ?", String.class, orderId);
+    private String orderNumberOf(Long orderId) {
+        return jdbcTemplate.queryForObject("SELECT order_number FROM orders WHERE id = ?", String.class, orderId);
     }
 
-    private boolean requiresDbi(Long orderId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT requires_dbi_validation FROM orders WHERE id = ?", Boolean.class, orderId);
+    private String statusOf(Long orderId) {
+        return jdbcTemplate.queryForObject("SELECT status FROM orders WHERE id = ?", String.class, orderId);
     }
 
     private Integer stockOf(Long entityId, Long productId) {

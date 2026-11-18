@@ -29,6 +29,7 @@ public class CustomUserDetails implements UserDetails {
     private final String entityCode;
     private final String entityName;
     private final boolean active;
+    private final boolean mustChangePassword;
 
     public CustomUserDetails(User user) {
         this.id = user.getId();
@@ -41,6 +42,7 @@ public class CustomUserDetails implements UserDetails {
         this.entityCode = user.getEntity().getCode();
         this.entityName = user.getEntity().getName();
         this.active = Boolean.TRUE.equals(user.getIsActive());
+        this.mustChangePassword = Boolean.TRUE.equals(user.getMustChangePassword());
     }
 
     @Override
