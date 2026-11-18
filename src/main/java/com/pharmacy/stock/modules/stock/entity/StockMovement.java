@@ -3,6 +3,7 @@ package com.pharmacy.stock.modules.stock.entity;
 import com.pharmacy.stock.modules.entity.entity.StructureEntity;
 import com.pharmacy.stock.modules.order.entity.Order;
 import com.pharmacy.stock.modules.product.entity.Product;
+import com.pharmacy.stock.modules.supply.entity.SupplyRequest;
 import com.pharmacy.stock.modules.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -47,6 +48,11 @@ public class StockMovement {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reference_order_id")
     private Order referenceOrder;
+
+    /** Mouvement lié à une demande d'approvisionnement (référence exclusive avec referenceOrder). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reference_supply_request_id")
+    private SupplyRequest referenceSupplyRequest;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_user_id", nullable = false)

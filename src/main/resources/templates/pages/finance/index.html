@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Suivi Financier DBI</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <h2 class="h5 mb-3"><i class="bi bi-cash-coin me-2"></i>Suivi Financier <span class="badge bg-danger">DBI</span></h2>
+
+    <div th:replace="~{fragments/components/alerts :: alert-success(${message})}"></div>
+    <div th:replace="~{fragments/components/alerts :: alert-danger(${error})}"></div>
+
+    <!-- Synthèse -->
+    <div class="row">
+        <div class="col-lg-6 col-12">
+            <div th:replace="~{fragments/components/cards :: info-box('fas fa-file-invoice-dollar', 'bg-blue', 'Total des engagements fournisseurs (commandes validées)', ${#numbers.formatDecimal(summary.totalEngagements, 1, 'WHITESPACE', 2, 'COMMA')} + ' F')}"></div>
+        </div>
+        <div class="col-lg-6 col-12">
+            <div th:replace="~{fragments/components/cards :: info-box('fas fa-box-open', 'bg-danger', 'Total des sorties de stock valorisées', ${#numbers.formatDecimal(summary.totalSortiesValorisees, 1, 'WHITESPACE', 2, 'COMMA')} + ' F')}"></div>
+        </div>
+    </div>
+
+    <!-- Filtre -->
+    <div class="card card-white shadow-sm mb-3 mt-1">
+        <div class="card-body py-2">
+            <form th:action="@{/finance}" method="get" class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label mb-0 small" for="type">Type de transaction</label>
+                    <select id="type" name="type" class="form-select form-select-sm">
+                        <option value="">Tous les types</option>
+                        <option th:each="transactionType : ${types}" th:value="${transactionType.name()}"
+                                th:text="${transactionType.label}"
+                                th:selected="${transactionType.name() == selectedType}">ENGAGEMENT_FOURNISSEUR</option>
+                    </select>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-funnel me-1"></i>Filtrer
+                    </button>
+                    <a th:href="@{/finance}" class="btn btn-sm btn-secondary">Réinitialiser</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-body">
+            <table id="finance-table" class="table table-bordered table-striped align-middle w-100">
+                <thead>
+                <tr>
+                    <th>Horodatage</th>
+                    <th>Type</th>
+                    <th class="text-end">Montant</th>
+                    <th>Référence</th>
+                    <th>Enregistrée par</th>
+                    <th>Commentaire</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="transaction : ${transactions}">
+                    <td class="small" th:text="${#temporals.format(transaction.createdAt, 'dd/MM/yyyy HH:mm')}">13/11/2026</td>
+                    <td th:replace="~{fragments/components/badges :: transaction-type-badge(${transaction.transactionType})}">TYPE</td>
+                    <td class="text-end fw-bold"
+                        th:text="${#numbers.formatDecimal(transaction.amount, 1, 'WHITESPACE', 2, 'COMMA')} + ' F'">0,00 F</td>
+                    <td class="small">
+                        <span th:if="${transaction.referenceOrderNumber != null}">
+                            <i class="bi bi-cart3 me-1"></i>Commande
+                            <a th:href="@{/orders}" th:text="${transaction.referenceOrderNumber}">CMD-2026-0001</a>
+                        </span>
+                        <span th:if="${transaction.referenceSupplyRequestNumber != null}">
+                            <i class="bi bi-box-arrow-in-down me-1"></i>Demande
+                            <a th:href="@{/supply-requests}" th:text="${transaction.referenceSupplyRequestNumber}">DEM-2026-0001</a>
+                        </span>
+                    </td>
+                    <td class="small" th:text="${transaction.recordedByName}">DBI Valideur</td>
+                    <td class="small text-muted" th:text="${transaction.comment}">—</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script layout:fragment="scripts" th:inline="none">
+    $(function () {
+        $('#finance-table').DataTable({
+            language: {
+                url: '/plugins/datatables/i18n/fr-FR.json',
+                emptyTable: 'Aucune transaction financière enregistrée.'
+            },
+            responsive: true,
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'Tous']],
+            order: [[0, 'desc']]
+        });
+    });
+</script>
+</body>
+</html>

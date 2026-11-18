@@ -87,9 +87,6 @@
                     <td class="small text-muted" th:text="${log.details}">—</td>
                     <td class="small" th:text="${log.ipAddress}">127.0.0.1</td>
                 </tr>
-                <tr th:if="${#lists.isEmpty(logs)}">
-                    <td colspan="7" class="text-center text-muted py-4">Aucune action journalisée pour ces filtres.</td>
-                </tr>
                 </tbody>
             </table>
         </div>
@@ -100,7 +97,8 @@
     $(function () {
         $('#audit-table').DataTable({
             language: {
-                url: '/plugins/datatables/i18n/fr-FR.json'
+                url: '/plugins/datatables/i18n/fr-FR.json',
+                emptyTable: 'Aucune action journalisée pour ces filtres.'
             },
             responsive: true,
             pageLength: 10,

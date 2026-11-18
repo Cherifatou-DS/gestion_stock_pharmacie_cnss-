@@ -21,14 +21,33 @@ public interface StockService {
 
     /**
      * Mise à jour du seuil d'alerte de réapprovisionnement d'une ligne de stock.
+     *
+     * @param userRole rôle de l'utilisateur : réservé aux rôles transverses
+     *                 (ADMIN et responsables) — les rôles de centre médical ne
+     *                 gèrent pas les seuils des autres structures.
      */
-    StockDto updateThreshold(Long stockId, StockThresholdFormDto form);
+    StockDto updateThreshold(Long stockId, StockThresholdFormDto form, String userRole);
 
     /**
      * Enregistrement d'un mouvement de stock (ENTREE, SORTIE ou AJUSTEMENT_INVENTAIRE)
      * avec mise à jour atomique de la ligne de stock associée.
      */
     StockMovementDto recordMovement(StockMovementFormDto form, Long userId);
+
+    /**
+     * Variante interne pour les circuits métier : rattache le mouvement à la
+     * commande fournisseur (réception au DC) ou à la demande d'approvisionnement
+     * (expédition / livraison) à l'origine du mouvement. Au plus une référence.
+     */
+    StockMovementDto recordMovement(StockMovementFormDto form, Long userId,
+                                    Long referenceSupplyRequestId, Long referenceOrderId);
+
+    /**
+     * Mouvement initié depuis l'interface utilisateur : contrôle d'accès
+     * horizontal — un rôle limité à sa structure ne peut écrire que sur celle-ci.
+     */
+    StockMovementDto recordUserMovement(StockMovementFormDto form, Long userId,
+                                        String userRole, Long userEntityId);
 
     List<StockMovementDto> findMovements(Long entityId, Long productId, String type);
 

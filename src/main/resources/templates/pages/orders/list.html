@@ -3,12 +3,12 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layouts/main-layout}">
 <head>
-    <title>Commandes</title>
+    <title>Commandes Fournisseurs</title>
 </head>
 <body>
 <div layout:fragment="content">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="h5 mb-0"><i class="bi bi-cart3 me-2"></i>Circuit des Commandes</h2>
+        <h2 class="h5 mb-0"><i class="bi bi-cart3 me-2"></i>Commandes Fournisseurs <span class="badge bg-danger">DAAS</span></h2>
         <a th:href="@{/orders/new}" class="btn btn-primary">
             <i class="bi bi-plus-circle me-1"></i>Nouvelle commande
         </a>
@@ -20,13 +20,13 @@
     <div class="card card-white shadow-sm mb-3">
         <div class="card-body py-2">
             <form th:action="@{/orders}" method="get" class="row g-2 align-items-end">
-                <div class="col-md-4" th:if="${!restricted}">
-                    <label class="form-label mb-0 small" for="sourceEntityId">Structure émettrice</label>
-                    <select id="sourceEntityId" name="sourceEntityId" class="form-select form-select-sm">
-                        <option value="">Toutes les structures</option>
-                        <option th:each="entity : ${entities}" th:value="${entity.id}"
-                                th:text="${entity.code + ' - ' + entity.name}"
-                                th:selected="${entity.id == selectedSourceEntityId}">CM01</option>
+                <div class="col-md-4">
+                    <label class="form-label mb-0 small" for="supplierEntityId">Fournisseur</label>
+                    <select id="supplierEntityId" name="supplierEntityId" class="form-select form-select-sm">
+                        <option value="">Tous les fournisseurs</option>
+                        <option th:each="supplier : ${suppliers}" th:value="${supplier.id}"
+                                th:text="${supplier.code + ' - ' + supplier.name}"
+                                th:selected="${supplier.id == selectedSupplierEntityId}">FRN01</option>
                     </select>
                 </div>
                 <div class="col-md-4">
@@ -55,44 +55,42 @@
                 <tr>
                     <th>N° Commande</th>
                     <th>Émetteur</th>
-                    <th>Destinataire</th>
-                    <th>Circuit</th>
+                    <th>Fournisseur</th>
+                    <th>Réception</th>
+                    <th class="text-end">Montant</th>
                     <th>Statut</th>
                     <th>Créée par</th>
-                    <th>Date</th>
                     <th class="text-center" style="width: 90px;">Actions</th>
                 </tr>
                 </thead>
                 <tbody>
                 <tr th:each="order : ${orders}">
-                    <td><span class="badge bg-navy" th:text="${order.orderNumber}">CMD-2026-0001</span></td>
                     <td>
-                        <span class="badge bg-navy" th:text="${order.sourceEntityCode}">CM01</span>
-                        <span class="small text-muted" th:text="${order.sourceEntityName}">Centre Médical 1</span>
+                        <span class="badge bg-navy" th:text="${order.orderNumber}">CMD-2026-0001</span>
+                        <div class="small text-muted" th:if="${order.supplyRequestNumber != null}"
+                             th:text="'Demande ' + ${order.supplyRequestNumber}">DEM-2026-0001</div>
                     </td>
                     <td>
-                        <span class="badge bg-navy" th:text="${order.targetEntityCode}">PC</span>
-                        <span class="small text-muted" th:text="${order.targetEntityName}">Pharmacie Centrale</span>
+                        <span class="badge bg-navy" th:text="${order.sourceEntityCode}">DAAS</span>
+                        <span class="small text-muted" th:text="${order.sourceEntityName}">DAAS</span>
                     </td>
-                    <td class="small">
-                        <span th:if="${order.requiresDbiValidation}" class="text-danger">
-                            <i class="bi bi-shield-exclamation me-1"></i>Validation DBI
-                        </span>
-                        <span th:unless="${order.requiresDbiValidation}" class="text-primary">
-                            <i class="bi bi-lightning me-1"></i>Direct (sans DBI)
-                        </span>
+                    <td>
+                        <span class="badge bg-navy" th:text="${order.supplierEntityCode}">FRN01</span>
+                        <span class="small text-muted" th:text="${order.supplierEntityName}">Fournisseur Principal</span>
                     </td>
+                    <td>
+                        <span class="badge bg-navy" th:text="${order.receivingEntityCode}">DC</span>
+                        <span class="small text-muted" th:text="${order.receivingEntityName}">Dépôt Central</span>
+                    </td>
+                    <td class="text-end"
+                        th:text="${#numbers.formatDecimal(order.totalAmount != null ? order.totalAmount : 0, 1, 'WHITESPACE', 2, 'COMMA')} + ' F'">0,00 F</td>
                     <td th:replace="~{fragments/components/badges :: order-status-badge(${order.status})}">STATUT</td>
-                    <td class="small" th:text="${order.createdByName}">Admin CNSS</td>
-                    <td class="small" th:text="${#temporals.format(order.createdAt, 'dd/MM/yyyy HH:mm')}">13/11/2026</td>
+                    <td class="small" th:text="${order.createdByName}">Agent DAAS</td>
                     <td class="text-center">
                         <a th:href="@{/orders/{id}(id=${order.id})}" class="btn btn-sm btn-primary" title="Détail">
                             <i class="bi bi-eye"></i>
                         </a>
                     </td>
-                </tr>
-                <tr th:if="${#lists.isEmpty(orders)}">
-                    <td colspan="8" class="text-center text-muted py-4">Aucune commande enregistrée.</td>
                 </tr>
                 </tbody>
             </table>
@@ -104,7 +102,8 @@
     $(function () {
         $('#orders-table').DataTable({
             language: {
-                url: '/plugins/datatables/i18n/fr-FR.json'
+                url: '/plugins/datatables/i18n/fr-FR.json',
+                emptyTable: 'Aucune commande fournisseur enregistrée.'
             },
             responsive: true,
             pageLength: 10,

@@ -10,23 +10,23 @@
     <!-- Indicateurs clés -->
     <div class="row">
         <div class="col-lg-3 col-6">
-            <a th:href="@{/orders}" class="text-decoration-none">
-                <div th:replace="~{fragments/components/cards :: info-box('fas fa-shopping-cart', 'bg-blue', 'Commandes en attente de traitement', ${pendingOrders})}"></div>
+            <a th:href="@{/supply-requests}" class="text-decoration-none">
+                <div th:replace="~{fragments/components/cards :: info-box('fas fa-box-arrow-down', 'bg-blue', 'Demandes d’approvisionnement à traiter', ${pendingSupplyRequests})}"></div>
             </a>
         </div>
         <div class="col-lg-3 col-6">
             <a th:href="@{/orders}" class="text-decoration-none">
-                <div th:replace="~{fragments/components/cards :: info-box('fas fa-truck-fast', 'bg-success', 'Commandes validées à expédier', ${readyToShipOrders})}"></div>
+                <div th:replace="~{fragments/components/cards :: info-box('fas fa-shield-halved', 'bg-danger', 'Commandes en attente de validation DBI', ${pendingOrders})}"></div>
+            </a>
+        </div>
+        <div class="col-lg-3 col-6">
+            <a th:href="@{/orders}" class="text-decoration-none">
+                <div th:replace="~{fragments/components/cards :: info-box('fas fa-truck-fast', 'bg-success', 'Commandes validées à transmettre au fournisseur', ${readyToSendOrders})}"></div>
             </a>
         </div>
         <div class="col-lg-3 col-6">
             <a th:href="@{/stocks(lowStockOnly=true)}" class="text-decoration-none">
-                <div th:replace="~{fragments/components/cards :: info-box('fas fa-exclamation-triangle', 'bg-danger', 'Produits en alerte de stock', ${lowStocks.size()})}"></div>
-            </a>
-        </div>
-        <div class="col-lg-3 col-6">
-            <a th:href="@{/products}" class="text-decoration-none">
-                <div th:replace="~{fragments/components/cards :: info-box('fas fa-capsules', 'bg-navy', 'Produits au catalogue', ${productCount})}"></div>
+                <div th:replace="~{fragments/components/cards :: info-box('fas fa-exclamation-triangle', 'bg-warning', 'Produits en alerte de stock', ${lowStocks.size()})}"></div>
             </a>
         </div>
     </div>
@@ -46,7 +46,7 @@
                         <thead>
                         <tr>
                             <th>N°</th>
-                            <th>Circuit</th>
+                            <th>Fournisseur</th>
                             <th>Statut</th>
                             <th>Créée par</th>
                             <th>Date</th>
@@ -57,9 +57,9 @@
                             <td>
                                 <span class="badge bg-navy" th:text="${order.orderNumber}">CMD-2026-0001</span>
                             </td>
-                            <td class="small" th:text="${order.sourceEntityCode + ' -> ' + order.targetEntityCode}">CM01 -> PC</td>
+                            <td class="small" th:text="${order.supplierEntityCode}">FRN01</td>
                             <td th:replace="~{fragments/components/badges :: order-status-badge(${order.status})}">STATUT</td>
-                            <td class="small" th:text="${order.createdByName}">Admin CNSS</td>
+                            <td class="small" th:text="${order.createdByName}">Agent DAAS</td>
                             <td class="small" th:text="${#temporals.format(order.createdAt, 'dd/MM/yyyy HH:mm')}">13/11/2026</td>
                         </tr>
                         <tr th:if="${#lists.isEmpty(recentOrders)}">

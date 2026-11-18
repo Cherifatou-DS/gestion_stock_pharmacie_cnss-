@@ -128,12 +128,12 @@ public class StructureEntityServiceImpl implements StructureEntityService {
     }
 
     private static final Set<String> ALLOWED_TYPES = Set.of(
-            "CENTRE_MEDICAL", "PHARMACIE_CENTRALE", "DEPOT_CENTRAL", "DBI", "FOURNISSEUR");
+            "CENTRE_MEDICAL", "PHARMACIE_CENTRALE", "DEPOT_CENTRAL", "DBI", "DAAS", "FOURNISSEUR");
 
     /**
-     * Types du circuit de distribution (CM, PC, DC, DBI) : structures de référence
-     * non désactivables. Seuls les fournisseurs peuvent être désactivés.
+     * Types du circuit de distribution (CM, PC, DC, DBI, DAAS) : structures de
+     * référence non désactivables. Seuls les fournisseurs peuvent être désactivés.
      */
     private static final Set<String> PROTECTED_TYPES = Set.of(
-            "CENTRE_MEDICAL", "PHARMACIE_CENTRALE", "DEPOT_CENTRAL", "DBI");
+            "CENTRE_MEDICAL", "PHARMACIE_CENTRALE", "DEPOT_CENTRAL", "DBI", "DAAS");
 }

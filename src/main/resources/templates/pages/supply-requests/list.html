@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layouts/main-layout}">
+<head>
+    <title>Demandes d'approvisionnement</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0"><i class="bi bi-box-arrow-in-down me-2"></i>Demandes d'approvisionnement
+            <span class="small text-muted">(CM → PC, PC → DC, DC → DAAS)</span></h2>
+        <a th:href="@{/supply-requests/new}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>Nouvelle demande
+        </a>
+    </div>
+
+    <div th:replace="~{fragments/components/alerts :: alert-success(${message})}"></div>
+
+    <!-- Filtres -->
+    <div class="card card-white shadow-sm mb-3">
+        <div class="card-body py-2">
+            <form th:action="@{/supply-requests}" method="get" class="row g-2 align-items-end">
+                <div class="col-md-4" th:if="${!restricted}">
+                    <label class="form-label mb-0 small" for="requestingEntityId">Structure demandeuse</label>
+                    <select id="requestingEntityId" name="requestingEntityId" class="form-select form-select-sm">
+                        <option value="">Toutes les structures</option>
+                        <option th:each="entity : ${entities}" th:value="${entity.id}"
+                                th:text="${entity.code + ' - ' + entity.name}"
+                                th:selected="${entity.id == selectedRequestingEntityId}">CM01</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label mb-0 small" for="status">Statut</label>
+                    <select id="status" name="status" class="form-select form-select-sm">
+                        <option value="">Tous les statuts</option>
+                        <option th:each="requestStatus : ${statuses}" th:value="${requestStatus.name()}"
+                                th:text="${requestStatus.label}"
+                                th:selected="${requestStatus.name() == selectedStatus}">SOUMISE</option>
+                    </select>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-funnel me-1"></i>Filtrer
+                    </button>
+                    <a th:href="@{/supply-requests}" class="btn btn-sm btn-secondary">Réinitialiser</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card card-white shadow-sm">
+        <div class="card-body">
+            <table id="supply-requests-table" class="table table-bordered table-striped align-middle w-100">
+                <thead>
+                <tr>
+                    <th>N° Demande</th>
+                    <th>Demandeuse</th>
+                    <th>Sollicitée</th>
+                    <th>Statut</th>
+                    <th>Créée par</th>
+                    <th>Date</th>
+                    <th class="text-center" style="width: 90px;">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="request : ${requests}">
+                    <td><span class="badge bg-navy" th:text="${request.requestNumber}">DEM-2026-0001</span></td>
+                    <td>
+                        <span class="badge bg-navy" th:text="${request.requestingEntityCode}">CM01</span>
+                        <span class="small text-muted" th:text="${request.requestingEntityName}">Centre Médical 1</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-navy" th:text="${request.supplyingEntityCode}">PC</span>
+                        <span class="small text-muted" th:text="${request.supplyingEntityName}">Pharmacie Centrale</span>
+                    </td>
+                    <td th:replace="~{fragments/components/badges :: supply-request-status-badge(${request.status})}">STATUT</td>
+                    <td class="small" th:text="${request.createdByName}">Chef CM01</td>
+                    <td class="small" th:text="${#temporals.format(request.createdAt, 'dd/MM/yyyy HH:mm')}">13/11/2026</td>
+                    <td class="text-center">
+                        <a th:href="@{/supply-requests/{id}(id=${request.id})}" class="btn btn-sm btn-primary" title="Détail">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script layout:fragment="scripts" th:inline="none">
+    $(function () {
+        $('#supply-requests-table').DataTable({
+            language: {
+                url: '/plugins/datatables/i18n/fr-FR.json',
+                emptyTable: 'Aucune demande d\'approvisionnement enregistrée.'
+            },
+            responsive: true,
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'Tous']],
+            order: [[0, 'desc']]
+        });
+    });
+</script>
+</body>
+</html>

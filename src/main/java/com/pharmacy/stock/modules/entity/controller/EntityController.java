@@ -1,6 +1,7 @@
 package com.pharmacy.stock.modules.entity.controller;
 
 import com.pharmacy.stock.common.exception.BusinessException;
+import com.pharmacy.stock.common.util.ClientIpResolver;
 import com.pharmacy.stock.modules.audit.service.AuditService;
 import com.pharmacy.stock.modules.entity.dto.EntityFormDto;
 import com.pharmacy.stock.modules.entity.service.StructureEntityService;
@@ -35,10 +36,12 @@ public class EntityController {
             "PHARMACIE_CENTRALE", "Pharmacie Centrale",
             "DEPOT_CENTRAL", "Dépôt Central",
             "DBI", "Direction des Biens et Inventaires",
+            "DAAS", "Division des Achats et des Approvisionnements Sanitaires",
             "FOURNISSEUR", "Fournisseur");
 
     private final StructureEntityService structureEntityService;
     private final AuditService auditService;
+    private final ClientIpResolver clientIpResolver;
 
     @GetMapping
     public String list(Model model) {
@@ -72,7 +75,7 @@ public class EntityController {
             auditService.record(currentUser.getId(), "CREATION", "ENTITIES", created.getId(),
                     "Création de la structure " + created.getCode() + " (" + created.getName()
                             + ", type " + created.getType() + ")",
-                    request.getRemoteAddr());
+                    clientIpResolver.resolve(request));
             redirectAttributes.addFlashAttribute("message",
                     "Structure " + created.getCode() + " créée avec succès.");
             return "redirect:/entities";
@@ -119,7 +122,7 @@ public class EntityController {
             auditService.record(currentUser.getId(), "MODIFICATION", "ENTITIES", updated.getId(),
                     "Modification de la structure " + updated.getCode() + " (" + updated.getName()
                             + ", type " + updated.getType() + ")",
-                    request.getRemoteAddr());
+                    clientIpResolver.resolve(request));
             redirectAttributes.addFlashAttribute("message",
                     "Structure " + updated.getCode() + " modifiée avec succès.");
             return "redirect:/entities";
@@ -142,7 +145,7 @@ public class EntityController {
             auditService.record(currentUser.getId(), "DEACTIVATION", "ENTITIES", entity.getId(),
                     "Désactivation de la structure " + entity.getCode() + " (" + entity.getName()
                             + ", type " + entity.getType() + ")",
-                    request.getRemoteAddr());
+                    clientIpResolver.resolve(request));
             redirectAttributes.addFlashAttribute("message",
                     "Structure " + entity.getCode() + " désactivée avec succès.");
         } catch (BusinessException e) {
@@ -161,7 +164,7 @@ public class EntityController {
             auditService.record(currentUser.getId(), "REACTIVATION", "ENTITIES", entity.getId(),
                     "Réactivation de la structure " + entity.getCode() + " (" + entity.getName()
                             + ", type " + entity.getType() + ")",
-                    request.getRemoteAddr());
+                    clientIpResolver.resolve(request));
             redirectAttributes.addFlashAttribute("message",
                     "Structure " + entity.getCode() + " réactivée avec succès.");
         } catch (BusinessException e) {

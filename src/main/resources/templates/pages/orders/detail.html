@@ -3,12 +3,12 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layouts/main-layout}">
 <head>
-    <title>Commande - Détail</title>
+    <title>Commande Fournisseur - Détail</title>
 </head>
 <body>
 <div layout:fragment="content">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="h5 mb-0"><i class="bi bi-cart3 me-2"></i>Commande <span class="badge bg-navy"
+        <h2 class="h5 mb-0"><i class="bi bi-cart3 me-2"></i>Commande fournisseur <span class="badge bg-navy"
             th:text="${order.orderNumber}">CMD-2026-0001</span></h2>
         <a th:href="@{/orders}" class="btn btn-secondary">
             <i class="bi bi-arrow-left me-1"></i>Retour à la liste
@@ -25,27 +25,39 @@
                 <div class="card-header"><h3 class="card-title">Informations</h3></div>
                 <div class="card-body">
                     <dl class="mb-0">
-                        <dt class="small text-muted">Émettrice</dt>
-                        <dd th:text="${order.sourceEntityCode + ' - ' + order.sourceEntityName}">CM01</dd>
-                        <dt class="small text-muted">Destinataire</dt>
-                        <dd th:text="${order.targetEntityCode + ' - ' + order.targetEntityName}">PC</dd>
-                        <dt class="small text-muted">Circuit</dt>
+                        <dt class="small text-muted">Émetteur (commande)</dt>
+                        <dd th:text="${order.sourceEntityCode + ' - ' + order.sourceEntityName}">DAAS</dd>
+                        <dt class="small text-muted">Fournisseur</dt>
+                        <dd th:text="${order.supplierEntityCode + ' - ' + order.supplierEntityName}">FRN01</dd>
+                        <dt class="small text-muted">Réception</dt>
+                        <dd th:text="${order.receivingEntityCode + ' - ' + order.receivingEntityName}">DC</dd>
+                        <dt class="small text-muted">Demande liée</dt>
                         <dd>
-                            <span th:if="${order.requiresDbiValidation}" class="text-danger">
-                                <i class="bi bi-shield-exclamation me-1"></i>Réapprovisionnement avec validation DBI
-                            </span>
-                            <span th:unless="${order.requiresDbiValidation}" class="text-primary">
-                                <i class="bi bi-lightning me-1"></i>Livraison directe (sans DBI)
-                            </span>
+                            <a th:if="${order.supplyRequestNumber != null}"
+                               th:href="@{/supply-requests/{id}(id=${order.supplyRequestId})}"
+                               th:text="${order.supplyRequestNumber}">DEM-2026-0001</a>
+                            <span th:unless="${order.supplyRequestNumber != null}" class="text-muted">Aucune</span>
                         </dd>
                         <dt class="small text-muted">Statut</dt>
                         <dd th:replace="~{fragments/components/badges :: order-status-badge(${order.status})}">STATUT</dd>
+                        <dt class="small text-muted">Montant total</dt>
+                        <dd class="fw-bold text-primary"
+                            th:text="${#numbers.formatDecimal(order.totalAmount != null ? order.totalAmount : 0, 1, 'WHITESPACE', 2, 'COMMA')} + ' F'">0,00 F</dd>
                         <dt class="small text-muted">Créée par</dt>
-                        <dd th:text="${order.createdByName}">Admin CNSS</dd>
-                        <dt class="small text-muted">Créée le</dt>
-                        <dd th:text="${#temporals.format(order.createdAt, 'dd/MM/yyyy HH:mm')}">13/11/2026</dd>
-                        <dt class="small text-muted">Mise à jour</dt>
-                        <dd th:text="${#temporals.format(order.updatedAt, 'dd/MM/yyyy HH:mm')}">13/11/2026</dd>
+                        <dd th:text="${order.createdByName}">Agent DAAS</dd>
+                        <dt class="small text-muted" th:if="${order.validatedAt != null}">Validée par (DBI)</dt>
+                        <dd th:if="${order.validatedAt != null}"
+                            th:text="${order.validatedByName} + ' — ' + ${#temporals.format(order.validatedAt, 'dd/MM/yyyy HH:mm')}">—</dd>
+                        <dt class="small text-muted" th:if="${order.sentAt != null}">Transmise au fournisseur le</dt>
+                        <dd th:if="${order.sentAt != null}" th:text="${#temporals.format(order.sentAt, 'dd/MM/yyyy HH:mm')}">—</dd>
+                        <dt class="small text-muted" th:if="${order.receivedAt != null}">Réceptionnée par</dt>
+                        <dd th:if="${order.receivedAt != null}"
+                            th:text="${order.receivedByName} + ' — ' + ${#temporals.format(order.receivedAt, 'dd/MM/yyyy HH:mm')}">—</dd>
+                        <dt class="small text-muted" th:if="${order.rejectionReason != null}">Motif du rejet</dt>
+                        <dd th:if="${order.rejectionReason != null}">
+                            <span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i><span
+                                    th:text="${order.rejectionReason}">Motif</span></span>
+                        </dd>
                     </dl>
                 </div>
             </div>
@@ -55,44 +67,39 @@
                 <div class="card-header"><h3 class="card-title">Actions</h3></div>
                 <div class="card-body d-grid gap-2">
                     <div th:if="${canSubmit}" class="text-center text-muted small">
-                        Soumettez la commande depuis cette page.
+                        Soumettez la commande à la validation DBI depuis cette page.
                     </div>
                     <form th:if="${canSubmit}" th:action="@{/orders/{id}/submit(id=${order.id})}" method="post">
                         <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-send me-1"></i>Soumettre la commande
+                            <i class="bi bi-send me-1"></i>Soumettre à la DBI
                         </button>
                     </form>
-                    <form th:if="${canDeliver}" th:action="@{/orders/{id}/deliver(id=${order.id})}" method="post">
-                        <button type="submit" class="btn btn-success w-100">
-                            <i class="bi bi-check2-circle me-1"></i>Valider et délivrer (débit PC)
-                        </button>
-                    </form>
+                    <div th:if="${canValidateDbi or canReject}" class="text-center text-muted small">
+                        Décision DBI requise (validation systématique).
+                    </div>
                     <form th:if="${canValidateDbi}" th:action="@{/orders/{id}/validate-dbi(id=${order.id})}" method="post">
                         <button type="submit" class="btn btn-success w-100">
-                            <i class="bi bi-shield-check me-1"></i>Valider (DBI)
+                            <i class="bi bi-shield-check me-1"></i>Valider (engagement fournisseur)
                         </button>
                     </form>
-                    <form th:if="${canShip}" th:action="@{/orders/{id}/ship(id=${order.id})}" method="post">
+                    <form th:if="${canSend}" th:action="@{/orders/{id}/send(id=${order.id})}" method="post">
                         <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-truck me-1"></i>Expédier (débit DC)
+                            <i class="bi bi-truck me-1"></i>Transmettre au fournisseur
                         </button>
                     </form>
-                    <form th:if="${canReceiveSupplier}" th:action="@{/orders/{id}/receive-supplier(id=${order.id})}" method="post">
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-box-seam me-1"></i>Réceptionner la livraison fournisseur (crédit DC)
-                        </button>
-                    </form>
-                    <form th:if="${canReceive}" th:action="@{/orders/{id}/receive(id=${order.id})}" method="post">
-                        <button type="submit" class="btn btn-success w-100">
-                            <i class="bi bi-download me-1"></i>Réceptionner (crédit stock)
-                        </button>
-                    </form>
-                    <form th:if="${canReject}" th:action="@{/orders/{id}/reject(id=${order.id})}" method="post">
+                    <div th:if="${canReceive}" class="text-center text-muted small">
+                        Réception au Dépôt Central : saisissez les quantités reçues ci-contre.
+                    </div>
+                    <form th:if="${canReject}" th:action="@{/orders/{id}/reject(id=${order.id})}"
+                          th:object="${rejectionForm}" method="post">
+                        <textarea class="form-control form-control-sm mb-2" rows="2"
+                                  th:field="*{rejectionReason}"
+                                  placeholder="Motif du rejet (obligatoire)"></textarea>
                         <button type="submit" class="btn btn-danger w-100">
                             <i class="bi bi-x-circle me-1"></i>Rejeter
                         </button>
                     </form>
-                    <div th:if="${!canSubmit and !canDeliver and !canReject and !canAdjust and !canValidateDbi and !canShip and !canReceive and !canReceiveSupplier}"
+                    <div th:if="${!canSubmit and !canAdjust and !canReject and !canValidateDbi and !canSend and !canReceive}"
                          class="text-center text-muted small">
                         <i class="bi bi-lock me-1"></i>Aucune action disponible pour votre rôle à ce stade du circuit.
                     </div>
@@ -112,7 +119,9 @@
                             <th>Désignation</th>
                             <th class="text-center">Qté demandée</th>
                             <th class="text-center">Qté ajustée DBI</th>
-                            <th class="text-center">Qté livrée</th>
+                            <th class="text-center">Qté reçue (DC)</th>
+                            <th class="text-end">Prix unitaire</th>
+                            <th class="text-end">Total ligne</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -123,7 +132,11 @@
                             <td class="text-center"
                                 th:text="${item.quantityAdjusted != null} ? ${item.quantityAdjusted} : '—'">—</td>
                             <td class="text-center fw-bold text-primary"
-                                th:text="${item.quantityDelivered}">0</td>
+                                th:text="${item.quantityReceived != null} ? ${item.quantityReceived} : 0">0</td>
+                            <td class="text-end"
+                                th:text="${#numbers.formatDecimal(item.unitPrice != null ? item.unitPrice : 0, 1, 'WHITESPACE', 2, 'COMMA')}">0,00</td>
+                            <td class="text-end fw-bold"
+                                th:text="${#numbers.formatDecimal(item.lineTotal, 1, 'WHITESPACE', 2, 'COMMA')}">0,00</td>
                         </tr>
                         </tbody>
                     </table>
@@ -161,6 +174,54 @@
                         <div class="text-end">
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-sliders me-1"></i>Enregistrer le réajustement
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Réception Dépôt Central -->
+            <div class="card card-white shadow-sm mt-3" th:if="${canReceive}">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="bi bi-box-seam me-1"></i>Réception des marchandises (Dépôt Central)</h3>
+                </div>
+                <div class="card-body">
+                    <form th:action="@{/orders/{id}/receive(id=${order.id})}" th:object="${receptionForm}"
+                          method="post" novalidate>
+                        <table class="table table-bordered align-middle">
+                            <thead>
+                            <tr>
+                                <th>Produit</th>
+                                <th class="text-center">Attendu</th>
+                                <th class="text-center">Déjà reçu</th>
+                                <th class="text-center" style="width: 180px;">Quantité reçue</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="item, stat : ${order.items}">
+                                <td th:text="${item.productCode + ' - ' + item.productDesignation}">MED001</td>
+                                <td class="text-center" th:text="${item.effectiveQuantity}">50</td>
+                                <td class="text-center"
+                                    th:text="${item.quantityReceived != null} ? ${item.quantityReceived} : 0">0</td>
+                                <td>
+                                    <input type="hidden" th:name="|receptions[${stat.index}].itemId|"
+                                           th:value="${item.id}">
+                                    <input type="number" min="0"
+                                           th:max="${item.effectiveQuantity - (item.quantityReceived != null ? item.quantityReceived : 0)}"
+                                           class="form-control form-control-sm"
+                                           th:name="|receptions[${stat.index}].receivedQuantity|" value="0">
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <div class="form-text mb-2">
+                            Une réception inférieure au total laisse la commande
+                            <span class="badge bg-warning">Reçue partiellement</span> ;
+                            vous pourrez compléter la réception ultérieurement.
+                        </div>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-box-seam me-1"></i>Enregistrer la réception
                             </button>
                         </div>
                     </form>

@@ -47,6 +47,13 @@ public class User {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    /**
+     * Changement de mot de passe obligatoire a la prochaine connexion
+     * (compte initial ou reinitialise, mot de passe connu).
+     */
+    @Column(name = "must_change_password", nullable = false)
+    private Boolean mustChangePassword = false;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 }

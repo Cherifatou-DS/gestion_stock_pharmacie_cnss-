@@ -1,5 +1,6 @@
 package com.pharmacy.stock.modules.user.service;
 
+import com.pharmacy.stock.modules.user.dto.ChangePasswordFormDto;
 import com.pharmacy.stock.modules.user.dto.UserDto;
 import com.pharmacy.stock.modules.user.dto.UserFormDto;
 
@@ -18,7 +19,17 @@ public interface UserService {
 
     UserDto updateUser(Long id, UserFormDto form);
 
-    UserDto toggleActive(Long id);
+    /**
+     * @param currentUserId identifiant de l'administrateur connecte (garde-fous
+     *                      auto-desactivation et dernier administrateur).
+     */
+    UserDto toggleActive(Long id, Long currentUserId);
+
+    /**
+     * Changement de mot de passe par l'utilisateur lui-meme
+     * (verification du mot de passe actuel, levee du drapeau must_change_password).
+     */
+    void changePassword(Long userId, ChangePasswordFormDto form);
 
     boolean existsByUsername(String username);
 

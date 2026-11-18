@@ -15,6 +15,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByOrderNumber(String orderNumber);
 
     /**
+     * Indique si une commande fournisseur est déjà liée à une demande d'approvisionnement.
+     */
+    boolean existsBySupplyRequestId(Long supplyRequestId);
+
+    /**
      * Nombre de commandes dans un ensemble de statuts (tableau de bord).
      */
     long countByStatusIn(List<String> statuses);
@@ -28,13 +33,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     String findLastOrderNumberOfYear(@Param("year") String year);
 
     /**
-     * Liste des commandes avec entités et auteur chargés, du plus récent au plus ancien.
-     * Les filtres null sont ignorés.
+     * Liste des commandes fournisseurs avec entités et auteur chargés,
+     * du plus récent au plus ancien. Les filtres null sont ignorés.
      */
     @Query("""
             select o from Order o
             join fetch o.sourceEntity s
-            join fetch o.targetEntity t
+            join fetch o.supplierEntity sup
+            join fetch o.receivingEntity rec
             join fetch o.createdByUser u
             where (:sourceEntityId is null or s.id = :sourceEntityId)
               and (:status is null or o.status = :status)
@@ -49,8 +55,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("""
             select distinct o from Order o
             join fetch o.sourceEntity s
-            join fetch o.targetEntity t
+            join fetch o.supplierEntity sup
+            join fetch o.receivingEntity rec
             join fetch o.createdByUser u
+            left join fetch o.supplyRequest sr
             left join fetch o.orderItems i
             join fetch i.product p
             where o.id = :id
